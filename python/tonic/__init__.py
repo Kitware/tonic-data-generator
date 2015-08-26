@@ -69,7 +69,7 @@ class DataHandler(object):
         """
         name, type, mimeType, fileName, dependencies
         """
-        newData = {}
+        newData = { 'metadata': {} }
         argName = kwargs['name']
         for key, value in kwargs.iteritems():
             if key == 'fileName':
@@ -78,6 +78,9 @@ class DataHandler(object):
                 newData[key] = value
 
         self.data[argName] = newData
+
+    def addDataMetaData(self, name, key, value):
+        self.data[name]['metadata'][key] = value
 
     def getDataAbsoluteFilePath(self, name, createDirectories=True):
         dataPattern = self.data[name]['pattern']

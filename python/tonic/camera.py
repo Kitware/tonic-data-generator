@@ -80,8 +80,8 @@ class SphericalCamera(object):
         # Compute all camera settings
         for theta in thetaAngles:
             for phi in phiAngles:
-                phiPos = rotate(phiAxis, phi, focalPoint, position)
-                thetaAxis = vectProduct(phiAxis, tuple(phiPos[i] - focalPoint[i] for i in range(3)))
+                phiPos = rotate(phiAxis, -phi, focalPoint, position)
+                thetaAxis = vectProduct(phiAxis, tuple(focalPoint[i]-phiPos[i] for i in range(3)))
                 thetaPhiPos = rotate(thetaAxis, theta, focalPoint, phiPos)
                 viewUp = rotate(thetaAxis, theta, (0,0,0), phiAxis)
 

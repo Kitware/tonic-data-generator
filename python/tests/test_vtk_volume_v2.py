@@ -34,25 +34,35 @@ def updatePieceWise(pwf, dataRange, center, halfSpread):
 writer = vtkDataSetWriter()
 imageWriter = vtkJPEGWriter()
 
+# def writeDepthMap(imageData, path):
+#     nbTuples = imageData.GetDimensions()[0] * imageData.GetDimensions()[1]
+
+#     depthDS = vtkImageData()
+#     depthDS.SetDimensions(imageData.GetDimensions())
+
+#     depth = vtkUnsignedCharArray()
+#     depth.SetNumberOfComponents(1)
+#     depth.SetNumberOfTuples(nbTuples)
+#     depth.SetName('Depth')
+#     depthDS.GetPointData().AddArray(depth)
+
+#     inputArray = imageData.GetPointData().GetArray(0)
+#     for i in range(nbTuples):
+#         depth.SetValue(i, int(inputArray.GetValue(i*3)))
+
+#     writer.SetInputData(depthDS)
+#     writer.SetFileName(path)
+#     writer.Update()
+
 def writeDepthMap(imageData, path):
     nbTuples = imageData.GetDimensions()[0] * imageData.GetDimensions()[1]
-
-    depthDS = vtkImageData()
-    depthDS.SetDimensions(imageData.GetDimensions())
-
-    depth = vtkUnsignedCharArray()
-    depth.SetNumberOfComponents(1)
-    depth.SetNumberOfTuples(nbTuples)
-    depth.SetName('Depth')
-    depthDS.GetPointData().AddArray(depth)
-
     inputArray = imageData.GetPointData().GetArray(0)
+    array = bytearray(nbTuples)
     for i in range(nbTuples):
-        depth.SetValue(i, int(inputArray.GetValue(i*3)))
+        array[i] = int(inputArray.GetValue(i*3))
 
-    writer.SetInputData(depthDS)
-    writer.SetFileName(path)
-    writer.Update()
+    with open(path, 'wb') as f:
+        f.write(array)
 
 def writeColorMap(imageData, path):
     nbTuples = imageData.GetDimensions()[0] * imageData.GetDimensions()[1]
@@ -100,7 +110,7 @@ centers = [ dataRange[0] + halfSpread*float(2*i+1) for i in range(nbSteps)]
 scalarOpacity = vtkPiecewiseFunction()
 
 volumeProperty = vtkVolumeProperty()
-volumeProperty.ShadeOn()
+# volumeProperty.ShadeOn()
 volumeProperty.SetInterpolationType(VTK_LINEAR_INTERPOLATION)
 volumeProperty.SetColor(colorFunction)
 volumeProperty.SetScalarOpacity(scalarOpacity)
@@ -113,6 +123,7 @@ window = vtkRenderWindow()
 window.SetSize(500, 500)
 
 renderer = vtkRenderer()
+renderer.SetBackground(0.5, 0.5, 0.6)
 window.AddRenderer(renderer)
 
 renderer.AddVolume(volume)
@@ -133,7 +144,7 @@ dsb = ImageDataSetBuilder(dataset_destination_path, 'image/jpg', {'type': 'spher
 dsb.getDataHandler().registerArgument(priority=1, name='pwf', label='Transfer function', values=centers, ui='slider')
 
 # Add Depth data
-dsb.getDataHandler().registerData(name='depth', type='array', fileName='_depth.vtk', categories=['depth'])
+dsb.getDataHandler().registerData(name='depth', type='array', fileName='_depth.uint8', metadata={ 'dimensions': window.GetSize() })
 
 # Loop over data and generate images
 dsb.start(window, renderer)
