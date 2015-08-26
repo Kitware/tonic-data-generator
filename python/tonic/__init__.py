@@ -49,7 +49,7 @@ class DataHandler(object):
         self.argOrder.append(argName)
         for key, value in kwargs.iteritems():
             if key == 'priority':
-                self.priority.append((argName, value))
+                self.priority.append([argName, value])
             elif key == 'values':
                 self.realValues[argName] = value
                 newArgument[key] = [ "{value}".format(value=x) for x in value ]
@@ -57,6 +57,11 @@ class DataHandler(object):
                 newArgument[key] = value
 
         self.arguments[argName] = newArgument
+
+    def updatePriority(self, argumentName, newPriority):
+        for item in self.priority:
+            if item[0] == argumentName:
+                item[1] = newPriority
 
     def setArguments(self, **kwargs):
         """

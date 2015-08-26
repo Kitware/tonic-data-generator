@@ -55,11 +55,17 @@ imageWriter = vtkJPEGWriter()
 #     writer.Update()
 
 def writeDepthMap(imageData, path):
-    nbTuples = imageData.GetDimensions()[0] * imageData.GetDimensions()[1]
+    width = imageData.GetDimensions()[0]
+    height = imageData.GetDimensions()[1]
+    nbTuples = width * height
+
     inputArray = imageData.GetPointData().GetArray(0)
     array = bytearray(nbTuples)
-    for i in range(nbTuples):
-        array[i] = int(inputArray.GetValue(i*3))
+    # Need to flip the data along Y
+    # and reverse data (big depth is on the front)
+    for j in range(height):
+        for i in range(width):
+            array[j*width + i] = 255 - int(inputArray.GetValue(((height-j-1)*width + i)*3))
 
     with open(path, 'wb') as f:
         f.write(array)

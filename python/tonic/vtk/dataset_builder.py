@@ -4,6 +4,8 @@ from tonic.camera import *
 
 from vtk import *
 
+encode_codes = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ'
+
 # -----------------------------------------------------------------------------
 # Basic Dataset Builder
 # -----------------------------------------------------------------------------
@@ -63,7 +65,7 @@ class DataSetBuilder(object):
 class ImageDataSetBuilder(DataSetBuilder):
     def __init__(self, location, imageMimeType, cameraInfo, metadata={}):
         DataSetBuilder.__init__(self, location, cameraInfo, metadata)
-        imageExtenstion = '.' + imageMimeType.split('/')[1]
+
         self.dataHandler.registerData(name='image', type='blob', mimeType=imageMimeType, fileName=imageExtenstion)
         self.imageCapture.SetFormat(imageMimeType)
 
@@ -75,3 +77,123 @@ class ImageDataSetBuilder(DataSetBuilder):
             update_camera(self.renderer, cam)
             self.renderWindow.Render()
             self.imageCapture.writeImage(self.dataHandler.getDataAbsoluteFilePath('image'))
+
+# -----------------------------------------------------------------------------
+# Volume Composite Dataset Builder
+# -----------------------------------------------------------------------------
+class VolumeCompositeDataSetBuilder(DataSetBuilder):
+    def __init__(self, location, imageMimeType, cameraInfo, metadata={}):
+        DataSetBuilder.__init__(self, location, cameraInfo, metadata)
+        self.imageMimeType = imageMimeType
+        self.imageExtenstion = '.' + imageMimeType.split('/')[1]
+        self.imageCapture.SetFormat(imageMimeType)
+        self.imageDataDepth = vtkImageData()
+        self.depthToWrite = None
+        self.layerInfo = {}
+        self.colorByMapping = {}
+        self.compositePipeline = {'layers': [], 'dimensions': [], 'fields': {}, 'layer_fields': {}, 'pipeline': []}
+        self.activeDepthKey = ''
+        self.activeRGBKey = ''
+
+    def activateLayer(self, parent, name, colorBy):
+        layerCode = ''
+        colorCode = ''
+        needToRegisterDepth = False
+        needToRegisterColor = False
+        if name in self.layerInfo:
+            # Layer already exist
+            layerCode = self.layerInfo[name]['code']
+            if colorBy not in self.compositePipeline['layer_fields'][name]:
+                if colorBy in self.colorByMapping:
+                    # Color already registered
+                    # => Add it for the field if not already in
+                    colorCode = self.colorByMapping[colorBy]
+                    if colorCode not in self.compositePipeline['layer_fields'][layerCode]:
+                        needToRegisterColor = True
+                        self.compositePipeline['layer_fields'][layerCode].append(colorCode)
+                else:
+                    needToRegisterColor = True
+                    # No color code assigned yet
+                    colorCode = encode_codes[len(self.colorByMapping)]
+                    # Assign color code
+                    self.colorByMapping[colorBy] = colorCode
+                    # Register color code with color by value
+                    self.compositePipeline['fields'][colorCode] = colorBy
+                    # Add color code to the layer
+                    self.compositePipeline['layer_fields'][layerCode].append(colorCode)
+        else:
+            # The layer does not exist yet
+            needToRegisterDepth = True
+            needToRegisterColor = True
+            layerCode = encode_codes[len(self.layerInfo)]
+            self.layerInfo[layerCode] = { 'code': layerCode, 'name': name, 'parent': parent }
+            self.compositePipeline['layers'].append(layerCode)
+            if colorBy in self.colorByMapping:
+                # The color code exist
+                colorCode = self.colorByMapping[colorBy]
+                self.compositePipeline['layer_fields'][layerCode] = [ colorCode ]
+            else:
+                # No color code assigned yet
+                colorCode = encode_codes[len(self.colorByMapping)]
+                # Assign color code
+                self.colorByMapping[colorBy] = colorCode
+                # Register color code with color by value
+                self.compositePipeline['fields'][colorCode] = colorBy
+                # Add color code to the layer
+                self.compositePipeline['layer_fields'][layerCode] = [ colorCode ]
+
+        # Update active keys
+        self.activeDepthKey = '%s_depth' % layerCode
+        self.activeRGBKey   = '%s%s_rgb' % (layerCode, colorCode)
+
+        # Need to register data
+        if needToRegisterDepth:
+            self.dataHandler.registerData(name=self.activeDepthKey, type='array', fileName='/%s_depth.uint8' % layerCode, categories=[ layerCode ])
+
+        if needToRegisterColor:
+            self.dataHandler.registerData(name=self.activeRGBKey, type='blob', fileName='/%s%s_rgb%s' % (layerCode, colorCode, self.imageExtenstion), categories=[ '%s%s' % (layerCode, colorCode) ], mimeType=self.imageMimeType)
+
+    def writeData(self, mapper):
+        width = self.renderWindow.GetSize()[0]
+        height = self.renderWindow.GetSize()[1]
+
+        if not self.depthToWrite:
+            self.depthToWrite = bytearray(width * height)
+
+        for cam in self.camera:
+            self.updateCamera(cam)
+            imagePath = self.dataHandler.getDataAbsoluteFilePath(self.activeRGBKey)
+            depthPath = self.dataHandler.getDataAbsoluteFilePath(self.activeDepthKey)
+
+            # -----------------------------------------------------------------
+            # Write Image
+            # -----------------------------------------------------------------
+            self.imageCapture.writeImage(imagePath)
+
+            # -----------------------------------------------------------------
+            # Write Depth
+            # -----------------------------------------------------------------
+            # Need to flip the data along Y and reverse data (front > back)
+            mapper.GetDepthTextureAsImageData(self.imageDataDepth)
+            inputArray = self.imageDataDepth.GetPointData().GetArray(0)
+            for j in range(height):
+                for i in range(width):
+                    self.depthToWrite[j*width + i] = 255 - int(inputArray.GetValue(((height-j-1)*width + i)*3))
+
+            with open(depthPath, 'wb') as f:
+                f.write(self.depthToWrite)
+
+    def start(self, renderWindow, renderer):
+        DataSetBuilder.start(self, renderWindow, renderer)
+        self.camera.updatePriority([2,1])
+
+    def stop(self):
+        # Build pipeline description
+        # => FIXME todo
+
+        # Push metadata
+        self.compositePipeline['dimensions'] = self.renderWindow.GetSize()
+        self.dataHandler.addSection('CompositePipeline', self.compositePipeline)
+
+        # Write metadata
+        DataSetBuilder.stop(self)

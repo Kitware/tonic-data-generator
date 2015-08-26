@@ -97,6 +97,11 @@ class SphericalCamera(object):
 
         self.dataHandler.updateBasePattern()
 
+    def updatePriority(self, priorityList):
+        keyList = ['theta', 'phi']
+        for idx in range(min(len(priorityList), len(keyList))):
+            self.dataHandler.updatePriority(keyList[idx], priorityList[idx])
+
     def __iter__(self):
         for cameraData in self.cameraSettings:
             self.dataHandler.setArguments(phi=cameraData['phiIdx'], theta=cameraData['thetaIdx'])
@@ -135,6 +140,11 @@ class CylindricalCamera(object):
 
         self.dataHandler.updateBasePattern()
 
+    def updatePriority(self, priorityList):
+        keyList = ['n_pos', 'phi']
+        for idx in range(min(len(priorityList), len(keyList))):
+            self.dataHandler.updatePriority(keyList[idx], priorityList[idx])
+
     def __iter__(self):
         for cameraData in self.cameraSettings:
             self.dataHandler.setArguments(phi=cameraData['phiIdx'], n_pos=cameraData['n_posIdx'])
@@ -151,32 +161,16 @@ class MultiViewCamera(object):
         self.cameraSettings = []
         self.positionNames = []
 
-        # Register arguments to the data handler
-        self.dataHandler.registerArgument(priority=0, name='phi', values=phiAngles, ui='slider', loop='modulo')
-        self.dataHandler.registerArgument(priority=0, name='n_pos', values=translationValues, ui='slider')
-
-        # Compute all camera settings
-        for translation in translationValues:
-            for phi in phiAngles:
-                phiPos = rotate(phiAxis, phi, focalPoint, position)
-                newfocalPoint = tuple(focalPoint[i] + (translation[i]*rotationAxis[i]) for i in range(3))
-                transPhiPoint = tuple(phiPos[i] + (translation[i]*rotationAxis[i]) for i in range(3))
-
-                self.cameraSettings.append({
-                    'n_pos': translation,
-                    'n_posIdx': translationValues.index(translation),
-                    'phi': phi,
-                    'phiIdx': phiAngles.index(phi),
-                    'focalPoint': newfocalPoint,
-                    'position': transPhiPoint,
-                    'viewUp': rotationAxis
-                })
-
     def registerViewPoint(self, name, focalPoint, position, viewUp):
         self.cameraSettings.append({'name': name, 'nameIdx': len(self.positionNames), 'focalPoint': focalPoint, 'position': position, 'viewUp': viewUp})
         self.positionNames.append(name)
         self.dataHandler.registerArgument(priority=0, name='multiView', values=self.positionNames)
         self.dataHandler.updateBasePattern()
+
+    def updatePriority(self, priorityList):
+        keyList = ['multiView']
+        for idx in range(min(len(priorityList), len(keyList))):
+            self.dataHandler.updatePriority(keyList[idx], priorityList[idx])
 
     def __iter__(self):
         for cameraData in self.cameraSettings:
