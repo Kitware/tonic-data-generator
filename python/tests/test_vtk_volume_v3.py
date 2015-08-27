@@ -77,7 +77,7 @@ window.Render()
 # -----------------------------------------------------------------------------
 
 # Create Image Builder
-vcdsb = VolumeCompositeDataSetBuilder(dataset_destination_path, 'image/png', {'type': 'spherical', 'phi': range(0, 360, 90), 'theta': [0]})
+vcdsb = VolumeCompositeDataSetBuilder(dataset_destination_path, 'image/png', {'type': 'spherical', 'phi': range(0, 360, 30), 'theta': range(-60, 61, 30)})
 
 idx = 0
 vcdsb.start(window, renderer)

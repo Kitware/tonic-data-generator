@@ -218,6 +218,7 @@ class VolumeCompositeDataSetBuilder(DataSetBuilder):
     def stop(self):
         # Push metadata
         self.compositePipeline['dimensions'] = self.renderWindow.GetSize()
+        self.compositePipeline['default_pipeline'] = self.compositePipeline['layers'].join('A') + 'A'
         self.dataHandler.addSection('CompositePipeline', self.compositePipeline)
 
         # Write metadata
