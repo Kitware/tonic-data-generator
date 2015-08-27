@@ -84,6 +84,9 @@ class ImageDataSetBuilder(DataSetBuilder):
 class VolumeCompositeDataSetBuilder(DataSetBuilder):
     def __init__(self, location, imageMimeType, cameraInfo, metadata={}):
         DataSetBuilder.__init__(self, location, cameraInfo, metadata)
+
+        self.dataHandler.addTypes('volume-composite', 'rgba+depth')
+
         self.imageMimeType = imageMimeType
         self.imageExtenstion = '.' + imageMimeType.split('/')[1]
 
