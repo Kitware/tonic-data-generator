@@ -37,7 +37,7 @@ source = vtkRTAnalyticSource()
 
 mapper = vtkGPUVolumeRayCastMapper()
 mapper.SetInputConnection(source.GetOutputPort())
-mapper.RenderToTextureOn()
+mapper.RenderToImageOn()
 
 colorFunction = vtkColorTransferFunction()
 colorFunction.AddRGBPoint(37.35310363769531, 0.231373, 0.298039, 0.752941)
@@ -72,14 +72,12 @@ renderer.AddVolume(volume)
 renderer.ResetCamera()
 window.Render()
 
-depthMap = vtkImageData()
-
 # -----------------------------------------------------------------------------
 # Data Generation
 # -----------------------------------------------------------------------------
 
 # Create Image Builder
-vcdsb = VolumeCompositeDataSetBuilder(dataset_destination_path, 'image/jpg', {'type': 'spherical', 'phi': range(0, 360, 90), 'theta': [0]})
+vcdsb = VolumeCompositeDataSetBuilder(dataset_destination_path, 'image/png', {'type': 'spherical', 'phi': range(0, 360, 90), 'theta': [0]})
 
 idx = 0
 vcdsb.start(window, renderer)

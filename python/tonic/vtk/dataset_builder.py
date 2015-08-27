@@ -65,7 +65,7 @@ class DataSetBuilder(object):
 class ImageDataSetBuilder(DataSetBuilder):
     def __init__(self, location, imageMimeType, cameraInfo, metadata={}):
         DataSetBuilder.__init__(self, location, cameraInfo, metadata)
-
+        imageExtenstion = '.' + imageMimeType.split('/')[1]
         self.dataHandler.registerData(name='image', type='blob', mimeType=imageMimeType, fileName=imageExtenstion)
         self.imageCapture.SetFormat(imageMimeType)
 
@@ -86,14 +86,24 @@ class VolumeCompositeDataSetBuilder(DataSetBuilder):
         DataSetBuilder.__init__(self, location, cameraInfo, metadata)
         self.imageMimeType = imageMimeType
         self.imageExtenstion = '.' + imageMimeType.split('/')[1]
-        self.imageCapture.SetFormat(imageMimeType)
+
+        if imageMimeType == 'image/png':
+            self.imageWriter = vtkPNGWriter()
+        if imageMimeType == 'image/jpg':
+            self.imageWriter = vtkJPEGWriter()
+
+        self.imageDataColor = vtkImageData()
+        self.imageWriter.SetInputData(self.imageDataColor)
+
         self.imageDataDepth = vtkImageData()
         self.depthToWrite = None
+
         self.layerInfo = {}
         self.colorByMapping = {}
         self.compositePipeline = {'layers': [], 'dimensions': [], 'fields': {}, 'layer_fields': {}, 'pipeline': []}
         self.activeDepthKey = ''
         self.activeRGBKey = ''
+        self.nodeWithChildren = {}
 
     def activateLayer(self, parent, name, colorBy):
         layerCode = ''
@@ -142,6 +152,21 @@ class VolumeCompositeDataSetBuilder(DataSetBuilder):
                 # Add color code to the layer
                 self.compositePipeline['layer_fields'][layerCode] = [ colorCode ]
 
+            # Let's register it in the pipeline
+            if parent:
+                if parent not in self.nodeWithChildren:
+                    # Need to create parent
+                    rootNode = {'name': parent, 'ids': [], 'children':[]}
+                    self.nodeWithChildren[parent] = rootNode
+                    self.compositePipeline['pipeline'].append(rootNode)
+
+                # Add node to its parent
+                self.nodeWithChildren[parent]['children'].append({'name': name, 'ids': [layerCode]})
+                self.nodeWithChildren[parent]['ids'].append(layerCode)
+
+            else:
+                self.compositePipeline['pipeline'].append({'name': name, 'ids': [layerCode]})
+
         # Update active keys
         self.activeDepthKey = '%s_depth' % layerCode
         self.activeRGBKey   = '%s%s_rgb' % (layerCode, colorCode)
@@ -168,17 +193,17 @@ class VolumeCompositeDataSetBuilder(DataSetBuilder):
             # -----------------------------------------------------------------
             # Write Image
             # -----------------------------------------------------------------
-            self.imageCapture.writeImage(imagePath)
+            mapper.GetColorImage(self.imageDataColor)
+            self.imageWriter.SetFileName(imagePath)
+            self.imageWriter.Write()
 
             # -----------------------------------------------------------------
             # Write Depth
             # -----------------------------------------------------------------
-            # Need to flip the data along Y and reverse data (front > back)
-            mapper.GetDepthTextureAsImageData(self.imageDataDepth)
+            mapper.GetDepthImage(self.imageDataDepth)
             inputArray = self.imageDataDepth.GetPointData().GetArray(0)
-            for j in range(height):
-                for i in range(width):
-                    self.depthToWrite[j*width + i] = 255 - int(inputArray.GetValue(((height-j-1)*width + i)*3))
+            for idx in range(inputArray.GetNumberOfTuples()):
+                self.depthToWrite[idx] = 255 - int(inputArray.GetValue(idx))
 
             with open(depthPath, 'wb') as f:
                 f.write(self.depthToWrite)
@@ -188,9 +213,6 @@ class VolumeCompositeDataSetBuilder(DataSetBuilder):
         self.camera.updatePriority([2,1])
 
     def stop(self):
-        # Build pipeline description
-        # => FIXME todo
-
         # Push metadata
         self.compositePipeline['dimensions'] = self.renderWindow.GetSize()
         self.dataHandler.addSection('CompositePipeline', self.compositePipeline)

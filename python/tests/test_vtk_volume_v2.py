@@ -2,7 +2,7 @@
 # User configuration
 # -----------------------------------------------------------------------------
 
-dataset_destination_path = '/Users/seb/Desktop/vtk_volume'
+dataset_destination_path = '/Users/seb/Desktop/vtk_volume_v2'
 
 # -----------------------------------------------------------------------------
 
@@ -31,28 +31,7 @@ def updatePieceWise(pwf, dataRange, center, halfSpread):
 
 # -----------------------------------------------------------------------------
 
-writer = vtkDataSetWriter()
-imageWriter = vtkJPEGWriter()
-
-# def writeDepthMap(imageData, path):
-#     nbTuples = imageData.GetDimensions()[0] * imageData.GetDimensions()[1]
-
-#     depthDS = vtkImageData()
-#     depthDS.SetDimensions(imageData.GetDimensions())
-
-#     depth = vtkUnsignedCharArray()
-#     depth.SetNumberOfComponents(1)
-#     depth.SetNumberOfTuples(nbTuples)
-#     depth.SetName('Depth')
-#     depthDS.GetPointData().AddArray(depth)
-
-#     inputArray = imageData.GetPointData().GetArray(0)
-#     for i in range(nbTuples):
-#         depth.SetValue(i, int(inputArray.GetValue(i*3)))
-
-#     writer.SetInputData(depthDS)
-#     writer.SetFileName(path)
-#     writer.Update()
+imageWriter = vtkPNGWriter()
 
 def writeDepthMap(imageData, path):
     width = imageData.GetDimensions()[0]
@@ -61,37 +40,17 @@ def writeDepthMap(imageData, path):
 
     inputArray = imageData.GetPointData().GetArray(0)
     array = bytearray(nbTuples)
-    # Need to flip the data along Y
-    # and reverse data (big depth is on the front)
-    for j in range(height):
-        for i in range(width):
-            array[j*width + i] = 255 - int(inputArray.GetValue(((height-j-1)*width + i)*3))
+
+    for idx in range(inputArray.GetNumberOfTuples()):
+        array[idx] = 255 - int(inputArray.GetValue(idx))
 
     with open(path, 'wb') as f:
         f.write(array)
 
 def writeColorMap(imageData, path):
-    nbTuples = imageData.GetDimensions()[0] * imageData.GetDimensions()[1]
-
-    colorDS = vtkImageData()
-    colorDS.SetDimensions(imageData.GetDimensions())
-
-    colorRGB = vtkUnsignedCharArray()
-    colorRGB.SetNumberOfComponents(3) # RGB
-    colorRGB.SetNumberOfTuples(nbTuples)
-    colorRGB.SetName('RGB')
-    colorDS.GetPointData().AddArray(colorRGB)
-    colorDS.GetPointData().SetActiveScalars('RGB')
-
-    inputArray = imageData.GetPointData().GetArray(0)
-    for i in range(nbTuples):
-        colorRGB.SetValue(i*3,   int(inputArray.GetValue(i*3)))
-        colorRGB.SetValue(i*3+1, int(inputArray.GetValue(i*3+1)))
-        colorRGB.SetValue(i*3+2, int(inputArray.GetValue(i*3+2)))
-
-    imageWriter.SetInputData(colorDS)
+    imageWriter.SetInputData(imageData)
     imageWriter.SetFileName(path)
-    imageWriter.Update()
+    imageWriter.Write()
 
 # -----------------------------------------------------------------------------
 # VTK Pipeline creation
@@ -101,7 +60,7 @@ source = vtkRTAnalyticSource()
 
 mapper = vtkGPUVolumeRayCastMapper()
 mapper.SetInputConnection(source.GetOutputPort())
-mapper.RenderToTextureOn()
+mapper.RenderToImageOn()
 
 colorFunction = vtkColorTransferFunction()
 colorFunction.AddRGBPoint(37.35310363769531, 0.231373, 0.298039, 0.752941)
@@ -144,7 +103,7 @@ depthMap = vtkImageData()
 # -----------------------------------------------------------------------------
 
 # Create Image Builder
-dsb = ImageDataSetBuilder(dataset_destination_path, 'image/jpg', {'type': 'spherical', 'phi': range(0, 360, 30), 'theta': range(-60, 61, 30)})
+dsb = ImageDataSetBuilder(dataset_destination_path, 'image/png', {'type': 'spherical', 'phi': range(0, 360, 30), 'theta': range(-60, 61, 30)})
 
 # Add PieceWise navigation
 dsb.getDataHandler().registerArgument(priority=1, name='pwf', label='Transfer function', values=centers, ui='slider')
@@ -159,11 +118,9 @@ for center in dsb.getDataHandler().pwf:
     for camera in dsb.getCamera():
         dsb.updateCamera(camera)
 
-        dsb.writeImage()
+        mapper.GetColorImage(colorMap)
+        writeColorMap(colorMap, dsb.getDataHandler().getDataAbsoluteFilePath('image'))
 
-        # mapper.GetColorTextureAsImageData(colorMap)
-        # writeColorMap(colorMap, dsb.getDataHandler().getDataAbsoluteFilePath('image'))
-
-        mapper.GetDepthTextureAsImageData(depthMap)
+        mapper.GetDepthImage(depthMap)
         writeDepthMap(depthMap, dsb.getDataHandler().getDataAbsoluteFilePath('depth'))
 dsb.stop()
