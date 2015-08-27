@@ -205,8 +205,9 @@ class VolumeCompositeDataSetBuilder(DataSetBuilder):
             # -----------------------------------------------------------------
             mapper.GetDepthImage(self.imageDataDepth)
             inputArray = self.imageDataDepth.GetPointData().GetArray(0)
-            for idx in range(inputArray.GetNumberOfTuples()):
-                self.depthToWrite[idx] = 255 - int(inputArray.GetValue(idx))
+            size = inputArray.GetNumberOfTuples()
+            for idx in range(size):
+                self.depthToWrite[size - idx - 1] = int(inputArray.GetValue(idx))
 
             with open(depthPath, 'wb') as f:
                 f.write(self.depthToWrite)
@@ -218,7 +219,7 @@ class VolumeCompositeDataSetBuilder(DataSetBuilder):
     def stop(self):
         # Push metadata
         self.compositePipeline['dimensions'] = self.renderWindow.GetSize()
-        self.compositePipeline['default_pipeline'] = self.compositePipeline['layers'].join('A') + 'A'
+        self.compositePipeline['default_pipeline'] = 'A'.join(self.compositePipeline['layers']) + 'A'
         self.dataHandler.addSection('CompositePipeline', self.compositePipeline)
 
         # Write metadata
