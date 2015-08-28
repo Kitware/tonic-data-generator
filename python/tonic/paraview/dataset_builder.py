@@ -46,7 +46,7 @@ class DataSetBuilder(object):
         if view.UseGradientBackground:
             bgColor2 = view.Background2
             bgColor2String = 'rgb(%d, %d, %d)' % tuple(int(bgColor2[i]*255) for i in range(3))
-            self.dataHandler.addMetaData('backgroundColor', 'linear-gradient(%s,%s)' % (bgColorString, bgColor2String))
+            self.dataHandler.addMetaData('backgroundColor', 'linear-gradient(%s,%s)' % (bgColor2String, bgColorString))
         else:
             self.dataHandler.addMetaData('backgroundColor', bgColorString)
 
