@@ -4,7 +4,23 @@ from tonic.camera import *
 
 from vtk import *
 
+from array import array as py_array
+
+# Global helper variables
 encode_codes = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ'
+arrayTypesMapping = '  bBhHiIlLfd'
+jsMapping = {
+    'b': 'Int8Array',
+    'B': 'Uint8Array',
+    'h': 'Int16Array',
+    'H': 'Int16Array',
+    'i': 'Int32Array',
+    'I': 'Uint32Array',
+    'l': 'Int32Array',
+    'L': 'Uint32Array',
+    'f': 'Float32Array',
+    'd': 'Float64Array'
+}
 
 # -----------------------------------------------------------------------------
 # Basic Dataset Builder
@@ -33,24 +49,26 @@ class DataSetBuilder(object):
         update_camera(self.renderer, camera)
         self.renderWindow.Render()
 
-    def start(self, renderWindow, renderer):
-        # Keep track of renderWindow and renderer
-        self.renderWindow = renderWindow
-        self.renderer = renderer
+    def start(self, renderWindow=None, renderer=None):
+        if renderWindow:
+            # Keep track of renderWindow and renderer
+            self.renderWindow = renderWindow
+            self.renderer = renderer
 
-        # Initialize image capture
-        self.imageCapture.SetRenderWindow(renderWindow)
+            # Initialize image capture
+            self.imageCapture.SetRenderWindow(renderWindow)
 
-        # Handle camera if any
-        if self.cameraDescription['type'] == 'spherical':
-            self.camera = create_spherical_camera(renderer, self.dataHandler, self.cameraDescription['phi'], self.cameraDescription['theta'])
-        elif self.cameraDescription['type'] == 'cylindrical':
-            self.camera = create_cylindrical_camera(renderer, self.dataHandler, self.cameraDescription['phi'], self.cameraDescription['translation'])
+            # Handle camera if any
+            if self.cameraDescription:
+                if self.cameraDescription['type'] == 'spherical':
+                    self.camera = create_spherical_camera(renderer, self.dataHandler, self.cameraDescription['phi'], self.cameraDescription['theta'])
+                elif self.cameraDescription['type'] == 'cylindrical':
+                    self.camera = create_cylindrical_camera(renderer, self.dataHandler, self.cameraDescription['phi'], self.cameraDescription['translation'])
 
-        # Update background color
-        bgColor = renderer.GetBackground()
-        bgColorString = 'rgb(%d, %d, %d)' % tuple(int(bgColor[i]*255) for i in range(3))
-        self.dataHandler.addMetaData('backgroundColor', bgColorString)
+            # Update background color
+            bgColor = renderer.GetBackground()
+            bgColorString = 'rgb(%d, %d, %d)' % tuple(int(bgColor[i]*255) for i in range(3))
+            self.dataHandler.addMetaData('backgroundColor', bgColorString)
 
         # Update file patterns
         self.dataHandler.updateBasePattern()
@@ -221,6 +239,52 @@ class VolumeCompositeDataSetBuilder(DataSetBuilder):
         self.compositePipeline['dimensions'] = self.renderWindow.GetSize()
         self.compositePipeline['default_pipeline'] = 'A'.join(self.compositePipeline['layers']) + 'A'
         self.dataHandler.addSection('CompositePipeline', self.compositePipeline)
+
+        # Write metadata
+        DataSetBuilder.stop(self)
+
+# -----------------------------------------------------------------------------
+# Data Prober Dataset Builder
+# -----------------------------------------------------------------------------
+class DataProberDataSetBuilder(DataSetBuilder):
+    def __init__(self, location, sampling_dimesions, fields_to_keep, custom_probing_bounds = None, metadata={}):
+        DataSetBuilder.__init__(self, location, None, metadata)
+        self.fieldsToWrite = fields_to_keep
+        self.resamplerFilter = vtkPResampleFilter()
+        self.resamplerFilter.SetSamplingDimension(sampling_dimesions)
+        if custom_probing_bounds:
+            self.resamplerFilter.SetUseInputBounds(0)
+            self.resamplerFilter.SetCustomSamplingBounds(custom_probing_bounds)
+        else:
+            self.resamplerFilter.SetUseInputBounds(1)
+
+        # Register all fields
+        self.dataHandler.addTypes('data-prober', 'binary')
+        self.DataProber = { 'fields_type': {}, 'dimensions': sampling_dimesions, 'fields_range': {} }
+        for field in self.fieldsToWrite:
+            self.dataHandler.registerData(name=field, type='array', fileName='%s.array' % field)
+
+    def setDataToProbe(self, dataset):
+        self.resamplerFilter.SetInputData(dataset)
+
+    def setSourceToProbe(self, source):
+        self.resamplerFilter.SetInputConnection(source.GetOutputPort())
+
+    def writeData(self):
+        self.resamplerFilter.Update()
+        arrays = self.resamplerFilter.GetOutput().GetPointData()
+        for field in self.fieldsToWrite:
+            array = arrays.GetArray(field)
+            b = buffer(array)
+            with open(self.dataHandler.getDataAbsoluteFilePath(field), 'wb') as f:
+                f.write(b)
+
+            self.DataProber['fields_type'][field] = jsMapping[arrayTypesMapping[array.GetDataType()]]
+            self.DataProber['fields_range'][field] = array.GetRange()
+
+    def stop(self):
+        # Push metadata
+        self.dataHandler.addSection('DataProber', self.DataProber)
 
         # Write metadata
         DataSetBuilder.stop(self)
