@@ -42,7 +42,13 @@ class DataSetBuilder(object):
         # Update background color
         bgColor = view.Background
         bgColorString = 'rgb(%d, %d, %d)' % tuple(int(bgColor[i]*255) for i in range(3))
-        self.dataHandler.addMetaData('backgroundColor', bgColorString)
+
+        if view.UseGradientBackground:
+            bgColor2 = view.Background2
+            bgColor2String = 'rgb(%d, %d, %d)' % tuple(int(bgColor2[i]*255) for i in range(3))
+            self.dataHandler.addMetaData('backgroundColor', 'linear-gradient(%s,%s)' % (bgColorString, bgColor2String))
+        else:
+            self.dataHandler.addMetaData('backgroundColor', bgColorString)
 
         # Update file patterns
         self.dataHandler.updateBasePattern()
