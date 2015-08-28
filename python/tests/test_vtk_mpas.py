@@ -2,7 +2,7 @@
 # User configuration
 # -----------------------------------------------------------------------------
 
-dataset_destination_path = '/Users/seb/Desktop/data_prober_mpas'
+dataset_destination_path = '/Users/seb/Desktop/vtk_data_prober_mpas'
 
 # -----------------------------------------------------------------------------
 
@@ -14,7 +14,7 @@ from tonic.vtk.dataset_builder import *
 data_base_path = '/Volumes/Backup3TB/DataExploration/Data/MPAS/data/flat_n_primal/'
 
 flat_file_pattern = 'LON_LAT_NLAYER-primal_%d_0.vtu'
-flat_file_times = range(50, 5151, 50)  # range(50, 5901, 50)
+flat_file_times = range(50, 101, 50) # range(50, 5151, 50)  # range(50, 5901, 50)
 
 flat_arrays = ['temperature', 'salinity']
 flat_sampling_size   = [ 500, 250, 30 ]
@@ -32,7 +32,7 @@ reader = vtkXMLUnstructuredGridReader()
 # Data Generation
 # -----------------------------------------------------------------------------
 
-dpdsb = DataProberDataSetBuilder(dataset_destination_path, flat_sampling_size, ['RTData'], flat_sampling_bounds)
+dpdsb = DataProberDataSetBuilder(dataset_destination_path, flat_sampling_size, flat_arrays, flat_sampling_bounds)
 dpdsb.setSourceToProbe(reader)
 
 # Add time information
@@ -41,6 +41,8 @@ dpdsb.getDataHandler().registerArgument(priority=1, name='time', values=flat_fil
 # Extract data
 dpdsb.start()
 for time in dpdsb.getDataHandler().time:
-    reader.SetFileName(data_base_path + (flat_file_pattern % time))
+    fileName = data_base_path + (flat_file_pattern % time)
+    reader.SetFileName(fileName)
+    print 'processing', fileName
     dpdsb.writeData()
 dpdsb.stop()

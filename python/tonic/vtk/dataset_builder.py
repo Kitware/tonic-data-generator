@@ -260,9 +260,9 @@ class DataProberDataSetBuilder(DataSetBuilder):
 
         # Register all fields
         self.dataHandler.addTypes('data-prober', 'binary')
-        self.DataProber = { 'fields_type': {}, 'dimensions': sampling_dimesions, 'fields_range': {} }
+        self.DataProber = { 'types': {}, 'dimensions': sampling_dimesions, 'ranges': {}, 'spacing': [1,1,1] }
         for field in self.fieldsToWrite:
-            self.dataHandler.registerData(name=field, type='array', fileName='%s.array' % field)
+            self.dataHandler.registerData(name=field, type='array', fileName='/%s.array' % field)
 
     def setDataToProbe(self, dataset):
         self.resamplerFilter.SetInputData(dataset)
@@ -275,12 +275,16 @@ class DataProberDataSetBuilder(DataSetBuilder):
         arrays = self.resamplerFilter.GetOutput().GetPointData()
         for field in self.fieldsToWrite:
             array = arrays.GetArray(field)
-            b = buffer(array)
-            with open(self.dataHandler.getDataAbsoluteFilePath(field), 'wb') as f:
-                f.write(b)
+            if array:
+                b = buffer(array)
+                with open(self.dataHandler.getDataAbsoluteFilePath(field), 'wb') as f:
+                    f.write(b)
 
-            self.DataProber['fields_type'][field] = jsMapping[arrayTypesMapping[array.GetDataType()]]
-            self.DataProber['fields_range'][field] = array.GetRange()
+                self.DataProber['types'][field] = jsMapping[arrayTypesMapping[array.GetDataType()]]
+                self.DataProber['ranges'][field] = array.GetRange()
+            else:
+                print 'No array for', field
+                print self.resamplerFilter.GetOutput()
 
     def stop(self):
         # Push metadata
