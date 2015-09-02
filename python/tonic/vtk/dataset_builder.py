@@ -281,7 +281,14 @@ class DataProberDataSetBuilder(DataSetBuilder):
                     f.write(b)
 
                 self.DataProber['types'][field] = jsMapping[arrayTypesMapping[array.GetDataType()]]
-                self.DataProber['ranges'][field] = array.GetRange()
+                if field in self.DataProber['ranges']:
+                    dataRange = array.GetRange()
+                    if dataRange[0] < self.DataProber['ranges'][field][0]:
+                        self.DataProber['ranges'][field][0] = dataRange[0]
+                    if dataRange[1] > self.DataProber['ranges'][field][1]:
+                        self.DataProber['ranges'][field][1] = dataRange[1]
+                else:
+                    self.DataProber['ranges'][field] = [array.GetRange()[0], array.GetRange()[1]]
             else:
                 print 'No array for', field
                 print self.resamplerFilter.GetOutput()

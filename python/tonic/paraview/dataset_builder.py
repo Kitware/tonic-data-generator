@@ -109,8 +109,8 @@ class DataProberDataSetBuilder(DataSetBuilder):
         for field in self.fieldsToWrite:
             self.dataHandler.registerData(name=field, type='array', fileName='/%s.array' % field)
 
-    def writeData(self):
-        self.resamplerFilter.UpdatePipeline()
+    def writeData(self, time=0):
+        self.resamplerFilter.UpdatePipeline(time)
         arrays = self.resamplerFilter.GetClientSideObject().GetOutput().GetPointData()
         for field in self.fieldsToWrite:
             array = arrays.GetArray(field)
@@ -120,7 +120,15 @@ class DataProberDataSetBuilder(DataSetBuilder):
                     f.write(b)
 
                 self.DataProber['types'][field] = jsMapping[arrayTypesMapping[array.GetDataType()]]
-                self.DataProber['ranges'][field] = array.GetRange()
+                if field in self.DataProber['ranges']:
+                    dataRange = array.GetRange()
+                    if dataRange[0] < self.DataProber['ranges'][field][0]:
+                        self.DataProber['ranges'][field][0] = dataRange[0]
+                    if dataRange[1] > self.DataProber['ranges'][field][1]:
+                        self.DataProber['ranges'][field][1] = dataRange[1]
+                else:
+                    self.DataProber['ranges'][field] = [array.GetRange()[0], array.GetRange()[1]]
+
             else:
                 print 'No array for', field
                 print self.resamplerFilter.GetOutput()
@@ -131,3 +139,22 @@ class DataProberDataSetBuilder(DataSetBuilder):
 
         # Write metadata
         DataSetBuilder.stop(self)
+
+
+# -----------------------------------------------------------------------------
+# Float Image with Layer Dataset Builder
+# -----------------------------------------------------------------------------
+
+class LayerDataSetBuilder(DataSetBuilder):
+    def __init__(self, input, location, cameraInfo, metadata={}):
+        DataSetBuilder.__init__(self, location, None, metadata)
+        self.floatImage = {'dimensions': [400, 400], 'layers': []}
+        self.layerMap = {}
+
+    def setActiveLayer(self, layer, field):
+        if layer not in self.layerMap:
+            self.layerMap[layer] = { 'name': layer},
+        print "setActiveLayer", layer, field
+
+    def writeLayerData(self):
+        pass
