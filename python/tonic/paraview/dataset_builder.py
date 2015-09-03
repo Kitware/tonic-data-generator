@@ -160,6 +160,9 @@ class LayerDataSetBuilder(DataSetBuilder):
         self.activeField = None
         self.layerChanged = False
 
+        # Update data type
+        self.dataHandler.addTypes('float-image')
+
     def getView(self):
         return self.view
 
