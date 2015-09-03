@@ -66,7 +66,10 @@ class SphericalCamera(object):
         self.phiBind = { "mouse" : { "drag" : { "modifier": 0, "coordinate": 0, "step": 30 , "orientation": 1} } }
 
         # Register arguments to the data handler
-        self.dataHandler.registerArgument(priority=0, name='phi', values=phiAngles, ui='slider', loop='modulo', bind=self.phiBind)
+        if phiAngles[-1] + phiAngles[1] == 360:
+            self.dataHandler.registerArgument(priority=0, name='phi', values=phiAngles, ui='slider', loop='modulo', bind=self.phiBind)
+        else:
+            self.dataHandler.registerArgument(priority=0, name='phi', values=phiAngles, ui='slider', bind=self.phiBind)
         if thetaAngles[0] < 0 and thetaAngles[0] >= -90:
             idx = 0
             for theta in thetaAngles:

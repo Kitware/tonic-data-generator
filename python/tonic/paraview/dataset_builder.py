@@ -2,6 +2,8 @@ from tonic          import *
 from tonic.paraview import *
 from tonic.camera   import *
 
+from tonic.paraview import data_writer
+
 from paraview import simple
 
 # Global helper variables
@@ -146,15 +148,96 @@ class DataProberDataSetBuilder(DataSetBuilder):
 # -----------------------------------------------------------------------------
 
 class LayerDataSetBuilder(DataSetBuilder):
-    def __init__(self, input, location, cameraInfo, metadata={}):
-        DataSetBuilder.__init__(self, location, None, metadata)
-        self.floatImage = {'dimensions': [400, 400], 'layers': []}
+    def __init__(self, input, location, cameraInfo, imageSize=[500,500], metadata={}):
+        DataSetBuilder.__init__(self, location, cameraInfo, metadata)
+        self.dataRenderer = data_writer.ScalarRenderer()
+        self.view = self.dataRenderer.getView()
+        self.view.ViewSize = imageSize
+        self.floatImage = {'dimensions': imageSize, 'layers': [], 'ranges': {}}
         self.layerMap = {}
+        self.input = input
+        self.activeLayer = None
+        self.activeField = None
+        self.layerChanged = False
 
-    def setActiveLayer(self, layer, field):
+    def getView(self):
+        return self.view
+
+    def setActiveLayer(self, layer, field, hasMesh=False):
+        needDataRegistration = False
         if layer not in self.layerMap:
-            self.layerMap[layer] = { 'name': layer},
-        print "setActiveLayer", layer, field
+            layerObj = { 'name': layer, 'array': field, 'arrays': [ field ], 'active': True, 'type': 'Float32Array', 'hasMesh': hasMesh }
+            self.layerMap[layer] = layerObj
+            self.floatImage['layers'].append(layerObj)
+            needDataRegistration = True
 
-    def writeLayerData(self):
-        pass
+            # Register layer lighting
+            self.dataHandler.registerData(name='%s__light' % layer, type='array', fileName='/%s__light.array' % layer)
+
+            # Register layer mesh
+            if hasMesh:
+                self.dataHandler.registerData(name='%s__mesh' % layer, type='array', fileName='/%s__mesh.array' % layer)
+
+        elif field not in self.layerMap[layer]['arrays']:
+            self.layerMap[layer]['arrays'].append(field)
+            needDataRegistration = True
+
+        # Keep track of the active data
+        if self.activeLayer != layer:
+            self.layerChanged = True
+        self.activeLayer = layer
+        self.activeField = field
+
+        if needDataRegistration:
+            self.dataHandler.registerData(name='%s_%s' % (layer, field), type='array', fileName='/%s_%s.array' % (layer, field))
+
+    def writeLayerData(self, time=0):
+        dataRange = [0, 1]
+        self.input.UpdatePipeline(time)
+
+        if self.activeField and self.activeLayer:
+
+            if self.layerChanged:
+                self.layerChanged = False
+
+                # Capture lighting information
+                for camPos in self.getCamera():
+                    self.view.CameraFocalPoint = camPos['focalPoint']
+                    self.view.CameraPosition = camPos['position']
+                    self.view.CameraViewUp = camPos['viewUp']
+                    self.dataRenderer.writeLightArray(self.dataHandler.getDataAbsoluteFilePath('%s__light'%self.activeLayer), self.input)
+
+                # Capture mesh information
+                if self.layerMap[self.activeLayer]['hasMesh']:
+                    for camPos in self.getCamera():
+                        self.view.CameraFocalPoint = camPos['focalPoint']
+                        self.view.CameraPosition = camPos['position']
+                        self.view.CameraViewUp = camPos['viewUp']
+                        self.dataRenderer.writeMeshArray(self.dataHandler.getDataAbsoluteFilePath('%s__mesh'%self.activeLayer), self.input)
+
+
+            for camPos in self.getCamera():
+                self.view.CameraFocalPoint = camPos['focalPoint']
+                self.view.CameraPosition = camPos['position']
+                self.view.CameraViewUp = camPos['viewUp']
+                dataName = ('%s_%s' % (self.activeLayer, self.activeField))
+                dataRange = self.dataRenderer.writeArray(self.dataHandler.getDataAbsoluteFilePath(dataName), self.input, self.activeField)
+
+            if self.activeField not in self.floatImage['ranges']:
+                self.floatImage['ranges'][self.activeField] = [ dataRange[0], dataRange[1] ]
+            else:
+                # Expand the ranges
+                if dataRange[0] < self.floatImage['ranges'][self.activeField][0]:
+                    self.floatImage['ranges'][self.activeField][0] = dataRange[0]
+                if dataRange[1] > self.floatImage['ranges'][self.activeField][1]:
+                    self.floatImage['ranges'][self.activeField][1] = dataRange[1]
+
+    def start(self):
+        DataSetBuilder.start(self, self.view)
+
+    def stop(self):
+        # Push metadata
+        self.dataHandler.addSection('FloatImage', self.floatImage)
+
+        # Write metadata
+        DataSetBuilder.stop(self)

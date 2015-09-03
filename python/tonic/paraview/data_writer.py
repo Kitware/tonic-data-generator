@@ -1,4 +1,4 @@
-import os
+import os, math
 
 from paraview import simple
 from vtk import *
@@ -27,13 +27,88 @@ VTK_DATA_TYPES = [ 'void',            # 0
 
 
 class ScalarRenderer(object):
-    def __init__(self):
+    def __init__(self, removePNG=True):
         simple.LoadDistributedPlugin('RGBZView')
+
         self.view = simple.CreateView('RGBZView')
+        self.view.Background = [0.0, 0.0, 0.0]
+        self.view.CenterAxesVisibility = 0
+        self.view.OrientationAxesVisibility = 0
+
         self.reader = vtkPNGReader()
+        self.cleanAfterMe = removePNG
 
     def getView(self):
         return self.view
+
+    def writeLightArray(self, path, source):
+        rep = simple.Show(source, self.view)
+        rep.Representation = 'Surface'
+        rep.DiffuseColor = [1,1,1]
+        simple.ColorBy(rep, ('POINTS', None))
+
+        # Grab data
+        tmpFileName = path + '__.png'
+        self.view.ResetClippingBounds()
+        simple.SaveScreenshot(tmpFileName, self.view)
+
+        # Convert data
+        self.reader.SetFileName(tmpFileName)
+        self.reader.Update()
+
+        rgbArray = self.reader.GetOutput().GetPointData().GetArray(0)
+        arraySize = rgbArray.GetNumberOfTuples()
+
+        rawArray = vtkUnsignedCharArray()
+        rawArray.SetNumberOfTuples(arraySize)
+
+        for idx in range(arraySize):
+            light = rgbArray.GetTuple3(idx)[0]
+            rawArray.SetTuple1(idx, light)
+
+        with open(path, 'wb') as f:
+            f.write(buffer(rawArray))
+
+        # Delete temporary file
+        if self.cleanAfterMe:
+            os.remove(tmpFileName)
+
+        simple.Hide(source, self.view)
+
+    def writeMeshArray(self, path, source):
+        rep = simple.Show(source, self.view)
+        rep.Representation = 'Surface With Edges'
+        rep.DiffuseColor = [0,0,0]
+        rep.EdgeColor = [1.0, 1.0, 1.0]
+        simple.ColorBy(rep, ('POINTS', None))
+
+        # Grab data
+        tmpFileName = path + '__.png'
+        self.view.ResetClippingBounds()
+        simple.SaveScreenshot(tmpFileName, self.view)
+
+        # Convert data
+        self.reader.SetFileName(tmpFileName)
+        self.reader.Update()
+
+        rgbArray = self.reader.GetOutput().GetPointData().GetArray(0)
+        arraySize = rgbArray.GetNumberOfTuples()
+
+        rawArray = vtkUnsignedCharArray()
+        rawArray.SetNumberOfTuples(arraySize)
+
+        for idx in range(arraySize):
+            light = rgbArray.GetTuple3(idx)[0]
+            rawArray.SetTuple1(idx, light)
+
+        with open(path, 'wb') as f:
+            f.write(buffer(rawArray))
+
+        # Delete temporary file
+        if self.cleanAfterMe:
+            os.remove(tmpFileName)
+
+        simple.Hide(source, self.view)
 
     def writeArray(self, path, source, name, component=0):
         rep = simple.Show(source, self.view)
@@ -41,8 +116,8 @@ class ScalarRenderer(object):
         rep.DiffuseColor = [1,1,1]
 
         dataRange = [0.0, 1.0]
+        fieldToColorBy = ['POINTS', name]
 
-        simple.ColorBy(rep, name)
         self.view.SetArrayNameToDraw = name
         self.SetArrayComponentToDraw = component
 
@@ -52,11 +127,20 @@ class ScalarRenderer(object):
         if pdi.GetArray(name):
             self.view.SetDrawCells = 0
             dataRange = pdi.GetArray(name).GetRange(component)
+            fieldToColorBy[0] = 'POINTS'
         elif cdi.GetArray(name):
             self.view.SetDrawCells = 1
             dataRange = cdi.GetArray(name).GetRange(component)
+            fieldToColorBy[0] = 'CELLS'
         else:
+            print "No array with that name", name
             return
+
+        realRange = dataRange
+        if dataRange[0] == dataRange[1]:
+          dataRange = [dataRange[0] - 0.1, dataRange[1] + 0.1]
+
+        simple.ColorBy(rep, fieldToColorBy)
 
         # Grab data
         tmpFileName = path + '__.png'
@@ -76,21 +160,29 @@ class ScalarRenderer(object):
         rawArray = vtkFloatArray()
         rawArray.SetNumberOfTuples(arraySize)
 
-        print dataRange
+        minValue = 10000.0
+        maxValue = -100000.0
         delta = (dataRange[1] - dataRange[0]) / 16777215.0 # 2^24 - 1 => 16,777,215
         for idx in range(arraySize):
             rgb = rgbArray.GetTuple3(idx)
             if rgb[0] != 0 or rgb[1] != 0 or rgb[2] != 0:
                 value = dataRange[0] + delta * float(rgb[0]*65536 + rgb[1]*256 + rgb[2] - 1)
                 rawArray.SetTuple1(idx, value)
+                minValue = min(value, minValue)
+                maxValue = max(value, maxValue)
             else:
                 rawArray.SetTuple1(idx, float('NaN'))
 
-        with open(path + name + '.float32', 'wb') as f:
+        # print 'Array bounds', minValue, maxValue, 'compare to', dataRange
+
+        with open(path, 'wb') as f:
             f.write(buffer(rawArray))
 
         # Delete temporary file
-        os.remove(tmpFileName)
+        if self.cleanAfterMe:
+          os.remove(tmpFileName)
 
         # Remove representation from view
         simple.Hide(source, self.view)
+
+        return realRange
