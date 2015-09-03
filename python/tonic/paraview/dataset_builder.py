@@ -175,11 +175,11 @@ class LayerDataSetBuilder(DataSetBuilder):
             needDataRegistration = True
 
             # Register layer lighting
-            self.dataHandler.registerData(name='%s__light' % layer, type='array', fileName='/%s__light.array' % layer)
+            self.dataHandler.registerData(name='%s__light' % layer, type='array', fileName='/%s__light.array' % layer, categories=[ '%s__light' % layer ])
 
             # Register layer mesh
             if hasMesh:
-                self.dataHandler.registerData(name='%s__mesh' % layer, type='array', fileName='/%s__mesh.array' % layer)
+                self.dataHandler.registerData(name='%s__mesh' % layer, type='array', fileName='/%s__mesh.array' % layer, categories=[ '%s__mesh' % layer ])
 
         elif field not in self.layerMap[layer]['arrays']:
             self.layerMap[layer]['arrays'].append(field)
@@ -192,7 +192,7 @@ class LayerDataSetBuilder(DataSetBuilder):
         self.activeField = field
 
         if needDataRegistration:
-            self.dataHandler.registerData(name='%s_%s' % (layer, field), type='array', fileName='/%s_%s.array' % (layer, field))
+            self.dataHandler.registerData(name='%s_%s' % (layer, field), type='array', fileName='/%s_%s.array' % (layer, field), categories=[ '%s_%s' % (layer, field) ])
 
     def writeLayerData(self, time=0):
         dataRange = [0, 1]
