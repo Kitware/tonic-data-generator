@@ -2,7 +2,8 @@
 # User configuration
 # -----------------------------------------------------------------------------
 
-dataset_destination_path = '/Users/seb/Desktop/vtk_volume_v3'
+dataset_destination_path = '/Users/seb/Desktop/vtk_spheres_volume'
+vti_sphere_path = '/Users/seb/Downloads/spheres.vti'
 
 # -----------------------------------------------------------------------------
 
@@ -33,19 +34,22 @@ def updatePieceWise(pwf, dataRange, center, halfSpread):
 # VTK Pipeline creation
 # -----------------------------------------------------------------------------
 
-source = vtkRTAnalyticSource()
+reader = vtkXMLImageDataReader()
+reader.SetFileName(vti_sphere_path)
+# reader.SetPointArrayStatus('ImageFile', 1)
+# reader.Update()
 
 mapper = vtkGPUVolumeRayCastMapper()
-mapper.SetInputConnection(source.GetOutputPort())
+mapper.SetInputConnection(reader.GetOutputPort())
 mapper.RenderToImageOn()
 
 colorFunction = vtkColorTransferFunction()
-colorFunction.AddRGBPoint(37.35310363769531, 0.231373, 0.298039, 0.752941)
-colorFunction.AddRGBPoint(157.0909652709961, 0.865003, 0.865003, 0.865003)
-colorFunction.AddRGBPoint(276.8288269042969, 0.705882, 0.0156863, 0.14902)
+colorFunction.AddRGBPoint(0.0, 0.231373, 0.298039, 0.752941)
+colorFunction.AddRGBPoint(128.0, 0.865003, 0.865003, 0.865003)
+colorFunction.AddRGBPoint(255.0, 0.705882, 0.0156863, 0.14902)
 
-dataRange = [37.3, 276.8]
-nbSteps = 5
+dataRange = [0.0, 255.0]
+nbSteps = 6
 halfSpread = (dataRange[1] - dataRange[0]) / float(2*nbSteps)
 centers = [ dataRange[0] + halfSpread*float(2*i+1) for i in range(nbSteps)]
 
@@ -65,7 +69,6 @@ window = vtkRenderWindow()
 window.SetSize(500, 500)
 
 renderer = vtkRenderer()
-renderer.SetBackground(0.5, 0.5, 0.6)
 window.AddRenderer(renderer)
 
 renderer.AddVolume(volume)
@@ -77,7 +80,7 @@ window.Render()
 # -----------------------------------------------------------------------------
 
 # Create Image Builder
-vcdsb = VolumeCompositeDataSetBuilder(dataset_destination_path, 'image/png', {'type': 'spherical', 'phi': [0, 90], 'theta': [0]})
+vcdsb = SortedCompositeDataSetBuilder(dataset_destination_path, {'type': 'spherical', 'phi': [0, 90], 'theta': [0]})
 
 idx = 0
 vcdsb.start(window, renderer)
@@ -86,12 +89,11 @@ for center in centers:
     updatePieceWise(scalarOpacity, dataRange, center, halfSpread)
 
     # Capture layer
-    vcdsb.activateLayer('Volumes', 'volume_%d' % idx, 'RTData')
+    vcdsb.activateLayer('ImageFile', center)
 
     # Write data
     vcdsb.writeData(mapper)
 
-vcdsb.stop()
-
+vcdsb.stop(clean=False)
 
 

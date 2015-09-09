@@ -4,7 +4,7 @@ from tonic.camera import *
 
 from vtk import *
 
-from array import array as py_array
+import json, os, math, gzip, shutil
 
 # Global helper variables
 encode_codes = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ'
@@ -299,3 +299,154 @@ class DataProberDataSetBuilder(DataSetBuilder):
 
         # Write metadata
         DataSetBuilder.stop(self)
+
+# -----------------------------------------------------------------------------
+# Sorted Composite Dataset Builder
+# -----------------------------------------------------------------------------
+class ConvertVolumeStackToSortedStack(object):
+    def __init__(self, width, height):
+        self.width = width
+        self.height = height
+        self.textureSize = 0
+        self.texturePadding = 0
+        self.layers = 0
+
+    def convert(self, directory):
+        imagePaths = {}
+        depthPaths = {}
+        layerNames = []
+        for fileName in os.listdir(directory):
+            if '_rgb' in fileName or '_depth' in fileName:
+                fileId = fileName.split('_')[0][0]
+                if '_rgb' in fileName:
+                    imagePaths[fileId] = os.path.join(directory, fileName)
+                else:
+                    layerNames.append(fileId)
+                    depthPaths[fileId] = os.path.join(directory, fileName)
+
+        layerNames.sort()
+
+        # Load data in Memory
+        depthArrays = []
+        imageReader = vtkPNGReader()
+        numberOfValues = self.width * self.height * len(layerNames)
+        self.layers = len(layerNames)
+        self.textureSize = int(math.ceil(math.sqrt(numberOfValues)))
+        self.texturePadding = int((self.textureSize * self.textureSize) - numberOfValues)
+        paddingArray = buffer(bytearray(self.texturePadding))
+
+        # Write all images as single buffer
+        with open(os.path.join(directory, 'rgba.uint8'), 'wb') as dataFile:
+            for layer in layerNames:
+                imageReader.SetFileName(imagePaths[layer])
+                imageReader.Update()
+                dataFile.write(buffer(imageReader.GetOutput().GetPointData().GetArray(0)))
+
+                with open(depthPaths[layer], 'rb') as depthFile:
+                    depthArrays.append(depthFile.read())
+
+            # Add padding to simplify texture loading
+            dataFile.write(paddingArray) # R
+            dataFile.write(paddingArray) # G
+            dataFile.write(paddingArray) # B
+            dataFile.write(paddingArray) # A
+
+        # Apply pixel sorting
+        destOrder = vtkUnsignedCharArray()
+        destOrder.SetNumberOfComponents(1)
+        destOrder.SetNumberOfTuples(self.width * self.height * len(layerNames))
+
+        imageSize = self.width * self.height
+        for pixelIdx in range(imageSize):
+            depthStack = []
+            for depthArray in depthArrays:
+                depthStack.append((depthArray[imageSize - pixelIdx - 1], len(depthStack)))
+            depthStack.sort(key=lambda tup: tup[0])
+
+            for destLayerIdx in range(len(depthStack)):
+                sourceLayerIdx = depthStack[destLayerIdx][1]
+
+                # Copy Idx
+                destOrder.SetValue(pixelIdx + imageSize * destLayerIdx, sourceLayerIdx)
+
+        with open(os.path.join(directory, 'order.uint8'), 'wb') as f:
+            f.write(buffer(destOrder))
+            f.write(paddingArray)
+
+
+class SortedCompositeDataSetBuilder(VolumeCompositeDataSetBuilder):
+    def __init__(self, location, cameraInfo, metadata={}):
+        VolumeCompositeDataSetBuilder.__init__(self, location, 'image/png', cameraInfo, metadata)
+        self.dataHandler.addTypes('sorted-composite', 'rgba')
+
+        # Register order and color textures
+        self.layerScalars = []
+        self.dataHandler.registerData(name='order', type='array', fileName='/order.uint8')
+        self.dataHandler.registerData(name='rgba', type='array', fileName='/rgba.uint8')
+
+    def start(self, renderWindow, renderer):
+        VolumeCompositeDataSetBuilder.start(self, renderWindow, renderer)
+        imageSize = self.renderWindow.GetSize()
+        self.dataConverter = ConvertVolumeStackToSortedStack(imageSize[0], imageSize[1])
+
+    def activateLayer(self, colorBy, scalar):
+        VolumeCompositeDataSetBuilder.activateLayer(self, 'root', '%d' % scalar, colorBy)
+        self.layerScalars.append(scalar)
+
+    def writeData(self, mapper):
+        VolumeCompositeDataSetBuilder.writeData(self, mapper)
+
+        # Fill data pattern
+        self.dataHandler.getDataAbsoluteFilePath('order')
+        self.dataHandler.getDataAbsoluteFilePath('rgba')
+
+    def stop(self, clean=True, compress=True):
+        VolumeCompositeDataSetBuilder.stop(self)
+
+        for cam in self.camera:
+            directoryToConvert = os.path.dirname(self.dataHandler.getDataAbsoluteFilePath('order'))
+            self.dataConverter.convert(directoryToConvert)
+
+        # Rename info.json to info_origin.json
+        os.rename(os.path.join(self.dataHandler.getBasePath(), "info.json"), os.path.join(self.dataHandler.getBasePath(), "info_origin.json"))
+
+        # Update info.json
+        with open(os.path.join(self.dataHandler.getBasePath(), "info_origin.json"), "r") as infoFile:
+            metadata = json.load(infoFile)
+            metadata['SortedComposite'] = {
+                'dimensions': metadata['CompositePipeline']['dimensions'],
+                'layers': self.dataConverter.layers,
+                'scalars': self.layerScalars[0:self.dataConverter.layers],
+                'textures': {
+                    'order': { 'size': self.dataConverter.textureSize },
+                    'rgba': { 'size': self.dataConverter.textureSize },
+                }
+            }
+
+            # Clean metadata
+            dataToKeep = []
+            del metadata['CompositePipeline']
+            for item in metadata['data']:
+                if item['name'] in ['order', 'rgba']:
+                    dataToKeep.append(item)
+            metadata['data'] = dataToKeep
+            metadata['type'] = [ "tonic-query-data-model", "sorted-composite", "rgba" ]
+
+            # Override info.json
+            with open(os.path.join(self.dataHandler.getBasePath(), "info.json"), 'w') as newMetaFile:
+                newMetaFile.write(json.dumps(metadata))
+
+        # Clean temporary data
+        if clean:
+            for root, dirs, files in os.walk(self.dataHandler.getBasePath()):
+                for name in files:
+                    if '_rgb.png' in name or '_depth.uint8' in name or name == "info_origin.json":
+                        os.remove(os.path.join(root, name))
+
+        if compress:
+            for root, dirs, files in os.walk(self.dataHandler.getBasePath()):
+                for name in files:
+                    if '.uint8' in name:
+                        with open(os.path.join(root, name), 'rb') as f_in, gzip.open(os.path.join(root, name + '.gz'), 'wb') as f_out:
+                            shutil.copyfileobj(f_in, f_out)
+                        os.remove(os.path.join(root, name))

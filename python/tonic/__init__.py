@@ -19,6 +19,9 @@ class DataHandler(object):
         self.realValues = {}
         self.can_write = True
 
+    def getBasePath(self):
+        return self.__root
+
     def updateBasePattern(self):
         self.priority.sort(key=lambda item: item[1])
         self.basePattern = ''

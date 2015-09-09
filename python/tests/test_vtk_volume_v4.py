@@ -2,7 +2,7 @@
 # User configuration
 # -----------------------------------------------------------------------------
 
-dataset_destination_path = '/Users/seb/Desktop/vtk_volume_v3'
+dataset_destination_path = '/Users/seb/Desktop/vtk_volume_v4'
 
 # -----------------------------------------------------------------------------
 
@@ -77,7 +77,7 @@ window.Render()
 # -----------------------------------------------------------------------------
 
 # Create Image Builder
-vcdsb = VolumeCompositeDataSetBuilder(dataset_destination_path, 'image/png', {'type': 'spherical', 'phi': [0, 90], 'theta': [0]})
+vcdsb = SortedCompositeDataSetBuilder(dataset_destination_path, {'type': 'spherical', 'phi': [0, 90], 'theta': [0]})
 
 idx = 0
 vcdsb.start(window, renderer)
@@ -86,7 +86,7 @@ for center in centers:
     updatePieceWise(scalarOpacity, dataRange, center, halfSpread)
 
     # Capture layer
-    vcdsb.activateLayer('Volumes', 'volume_%d' % idx, 'RTData')
+    vcdsb.activateLayer('RTData', center)
 
     # Write data
     vcdsb.writeData(mapper)
