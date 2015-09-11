@@ -225,7 +225,7 @@ class VolumeCompositeDataSetBuilder(DataSetBuilder):
             inputArray = self.imageDataDepth.GetPointData().GetArray(0)
             size = inputArray.GetNumberOfTuples()
             for idx in range(size):
-                self.depthToWrite[size - idx - 1] = int(inputArray.GetValue(idx))
+                self.depthToWrite[idx] = int(inputArray.GetValue(idx))
 
             with open(depthPath, 'wb') as f:
                 f.write(self.depthToWrite)
@@ -330,44 +330,60 @@ class ConvertVolumeStackToSortedStack(object):
         depthArrays = []
         imageReader = vtkPNGReader()
         numberOfValues = self.width * self.height * len(layerNames)
+        imageSize = self.width * self.height
         self.layers = len(layerNames)
         self.textureSize = int(math.ceil(math.sqrt(numberOfValues)))
         self.texturePadding = int((self.textureSize * self.textureSize) - numberOfValues)
         paddingArray = buffer(bytearray(self.texturePadding))
 
         # Write all images as single buffer
-        with open(os.path.join(directory, 'rgba.uint8'), 'wb') as dataFile:
-            for layer in layerNames:
-                imageReader.SetFileName(imagePaths[layer])
-                imageReader.Update()
-                dataFile.write(buffer(imageReader.GetOutput().GetPointData().GetArray(0)))
+        opacity = vtkUnsignedCharArray()
+        opacity.SetNumberOfComponents(1)
+        opacity.SetNumberOfTuples(numberOfValues)
 
-                with open(depthPaths[layer], 'rb') as depthFile:
-                    depthArrays.append(depthFile.read())
+        intensity = vtkUnsignedCharArray()
+        intensity.SetNumberOfComponents(1)
+        intensity.SetNumberOfTuples(numberOfValues)
 
-            # Add padding to simplify texture loading
-            dataFile.write(paddingArray) # R
-            dataFile.write(paddingArray) # G
-            dataFile.write(paddingArray) # B
-            dataFile.write(paddingArray) # A
+        for layer in range(self.layers):
+            imageReader.SetFileName(imagePaths[layerNames[layer]])
+            imageReader.Update()
+
+            rgbaArray = imageReader.GetOutput().GetPointData().GetArray(0)
+
+            for idx in range(imageSize):
+                intensity.SetValue((layer * imageSize) + idx, rgbaArray.GetValue(idx*4))
+                opacity.SetValue((layer * imageSize) + idx, rgbaArray.GetValue(idx*4 + 3))
+
+            with open(depthPaths[layerNames[layer]], 'rb') as depthFile:
+                depthArrays.append(depthFile.read())
+
+        # Add opacity + padding
+        with open(os.path.join(directory, 'alpha.uint8'), 'wb') as alphaFile:
+            alphaFile.write(buffer(opacity))
+            alphaFile.write(paddingArray)
+
+        # Add intensity + padding
+        with open(os.path.join(directory, 'intensity.uint8'), 'wb') as intensityFile:
+            intensityFile.write(buffer(intensity))
+            intensityFile.write(paddingArray)
 
         # Apply pixel sorting
         destOrder = vtkUnsignedCharArray()
         destOrder.SetNumberOfComponents(1)
-        destOrder.SetNumberOfTuples(self.width * self.height * len(layerNames))
+        destOrder.SetNumberOfTuples(numberOfValues)
 
-        imageSize = self.width * self.height
         for pixelIdx in range(imageSize):
             depthStack = []
             for depthArray in depthArrays:
-                depthStack.append((depthArray[imageSize - pixelIdx - 1], len(depthStack)))
+                depthStack.append((depthArray[pixelIdx], len(depthStack)))
             depthStack.sort(key=lambda tup: tup[0])
 
             for destLayerIdx in range(len(depthStack)):
                 sourceLayerIdx = depthStack[destLayerIdx][1]
 
                 # Copy Idx
-                destOrder.SetValue(pixelIdx + imageSize * destLayerIdx, sourceLayerIdx)
+                destOrder.SetValue((imageSize * destLayerIdx) + pixelIdx, sourceLayerIdx)
 
         with open(os.path.join(directory, 'order.uint8'), 'wb') as f:
             f.write(buffer(destOrder))
@@ -381,8 +397,9 @@ class SortedCompositeDataSetBuilder(VolumeCompositeDataSetBuilder):
 
         # Register order and color textures
         self.layerScalars = []
-        self.dataHandler.registerData(name='order', type='array', fileName='/order.uint8')
-        self.dataHandler.registerData(name='rgba', type='array', fileName='/rgba.uint8')
+        self.dataHandler.registerData(name='order',     type='array', fileName='/order.uint8')
+        self.dataHandler.registerData(name='alpha',     type='array', fileName='/alpha.uint8')
+        self.dataHandler.registerData(name='intensity', type='array', fileName='/intensity.uint8', categories=['intensity'])
 
     def start(self, renderWindow, renderer):
         VolumeCompositeDataSetBuilder.start(self, renderWindow, renderer)
@@ -398,14 +415,17 @@ class SortedCompositeDataSetBuilder(VolumeCompositeDataSetBuilder):
 
         # Fill data pattern
         self.dataHandler.getDataAbsoluteFilePath('order')
-        self.dataHandler.getDataAbsoluteFilePath('rgba')
+        self.dataHandler.getDataAbsoluteFilePath('alpha')
+        self.dataHandler.getDataAbsoluteFilePath('intensity')
 
     def stop(self, clean=True, compress=True):
         VolumeCompositeDataSetBuilder.stop(self)
 
-        for cam in self.camera:
-            directoryToConvert = os.path.dirname(self.dataHandler.getDataAbsoluteFilePath('order'))
-            self.dataConverter.convert(directoryToConvert)
+        # Go through all directories and convert them
+        for root, dirs, files in os.walk(self.dataHandler.getBasePath()):
+            for name in dirs:
+                print 'Process', os.path.join(root, name)
+                self.dataConverter.convert(os.path.join(root, name))
 
         # Rename info.json to info_origin.json
         os.rename(os.path.join(self.dataHandler.getBasePath(), "info.json"), os.path.join(self.dataHandler.getBasePath(), "info_origin.json"))
@@ -418,8 +438,9 @@ class SortedCompositeDataSetBuilder(VolumeCompositeDataSetBuilder):
                 'layers': self.dataConverter.layers,
                 'scalars': self.layerScalars[0:self.dataConverter.layers],
                 'textures': {
-                    'order': { 'size': self.dataConverter.textureSize },
-                    'rgba': { 'size': self.dataConverter.textureSize },
+                    'order'    : { 'size': self.dataConverter.textureSize },
+                    'alpha'    : { 'size': self.dataConverter.textureSize },
+                    'intensity': { 'size': self.dataConverter.textureSize }
                 }
             }
 
@@ -427,10 +448,10 @@ class SortedCompositeDataSetBuilder(VolumeCompositeDataSetBuilder):
             dataToKeep = []
             del metadata['CompositePipeline']
             for item in metadata['data']:
-                if item['name'] in ['order', 'rgba']:
+                if item['name'] in ['order', 'alpha', 'intensity']:
                     dataToKeep.append(item)
             metadata['data'] = dataToKeep
-            metadata['type'] = [ "tonic-query-data-model", "sorted-composite", "rgba" ]
+            metadata['type'] = [ "tonic-query-data-model", "sorted-composite", "alpha" ]
 
             # Override info.json
             with open(os.path.join(self.dataHandler.getBasePath(), "info.json"), 'w') as newMetaFile:
@@ -439,14 +460,16 @@ class SortedCompositeDataSetBuilder(VolumeCompositeDataSetBuilder):
         # Clean temporary data
         if clean:
             for root, dirs, files in os.walk(self.dataHandler.getBasePath()):
+                print 'Clean', root
                 for name in files:
                     if '_rgb.png' in name or '_depth.uint8' in name or name == "info_origin.json":
                         os.remove(os.path.join(root, name))
 
         if compress:
             for root, dirs, files in os.walk(self.dataHandler.getBasePath()):
+                print 'Compress', root
                 for name in files:
-                    if '.uint8' in name:
+                    if '.uint8' in name and '.gz' not in name:
                         with open(os.path.join(root, name), 'rb') as f_in, gzip.open(os.path.join(root, name + '.gz'), 'wb') as f_out:
                             shutil.copyfileobj(f_in, f_out)
                         os.remove(os.path.join(root, name))

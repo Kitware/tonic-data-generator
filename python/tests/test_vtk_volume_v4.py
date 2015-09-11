@@ -2,7 +2,7 @@
 # User configuration
 # -----------------------------------------------------------------------------
 
-dataset_destination_path = '/Users/seb/Desktop/vtk_volume_v4'
+dataset_destination_path = '/Users/seb/Desktop/wavelet_%s'
 
 # -----------------------------------------------------------------------------
 
@@ -40,9 +40,8 @@ mapper.SetInputConnection(source.GetOutputPort())
 mapper.RenderToImageOn()
 
 colorFunction = vtkColorTransferFunction()
-colorFunction.AddRGBPoint(37.35310363769531, 0.231373, 0.298039, 0.752941)
-colorFunction.AddRGBPoint(157.0909652709961, 0.865003, 0.865003, 0.865003)
-colorFunction.AddRGBPoint(276.8288269042969, 0.705882, 0.0156863, 0.14902)
+colorFunction.AddRGBPoint(37.35310363769531, 1.0, 1.0, 1.0)
+colorFunction.AddRGBPoint(276.8288269042969, 1.0, 1.0, 1.0)
 
 dataRange = [37.3, 276.8]
 nbSteps = 5
@@ -77,7 +76,7 @@ window.Render()
 # -----------------------------------------------------------------------------
 
 # Create Image Builder
-vcdsb = SortedCompositeDataSetBuilder(dataset_destination_path, {'type': 'spherical', 'phi': [0, 90], 'theta': [0]})
+vcdsb = SortedCompositeDataSetBuilder(dataset_destination_path % nbSteps, {'type': 'spherical', 'phi': range(0, 360, 30), 'theta': range(-60, 61, 60)})
 
 idx = 0
 vcdsb.start(window, renderer)
