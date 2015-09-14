@@ -15,12 +15,12 @@ from tonic.vtk.dataset_builder import *
 # User configuration
 # -----------------------------------------------------------------------------
 
-dataset_destination_path = '/Users/seb/Desktop/vm_head_frozenct_vi_%s_%s_%s'
+dataset_destination_path = '/Users/seb/Desktop/vm_head_frozenct_steps_%s_%s_%s'
 file_path = '/Users/seb/Downloads/vm_head_frozenct.mha'
 
 field = 'MetaImage'
 fieldRange = [0.0, 4095.0]
-nbSteps = 4
+nbSteps = 13
 
 # -----------------------------------------------------------------------------
 # VTK Helper methods
@@ -42,6 +42,17 @@ def updatePieceWise(pwf, dataRange, center, halfSpread):
         scalarOpacity.AddPoint(center + halfSpread, 0.0)
         scalarOpacity.AddPoint(dataRange[1], 0.0)
 
+
+def updatePieceWiseAsStep(pwf, dataRange, start, step):
+    scalarOpacity.RemoveAllPoints()
+
+    scalarOpacity.AddPoint(dataRange[0], 0.0)
+    scalarOpacity.AddPoint(start-1, 0.0)
+    scalarOpacity.AddPoint(start, 1.0)
+    scalarOpacity.AddPoint(start+step, 1.0)
+    scalarOpacity.AddPoint(start+step+1, 0.0)
+    scalarOpacity.AddPoint(dataRange[1], 0.0)
+
 # -----------------------------------------------------------------------------
 # VTK Pipeline creation
 # -----------------------------------------------------------------------------
@@ -57,8 +68,8 @@ colorFunction = vtkColorTransferFunction()
 colorFunction.AddRGBPoint(fieldRange[0], 1.0, 1.0, 1.0)
 colorFunction.AddRGBPoint(fieldRange[1], 1.0, 1.0, 1.0)
 
-halfSpread = (fieldRange[1] - fieldRange[0]) / float(2*nbSteps)
-centers = [ fieldRange[0] + halfSpread*float(2*i+1) for i in range(nbSteps)]
+step = 250
+starts = [ 790 + step*i for i in range(nbSteps)]
 
 scalarOpacity = vtkPiecewiseFunction()
 
@@ -73,7 +84,7 @@ volume.SetMapper(mapper)
 volume.SetProperty(volumeProperty)
 
 window = vtkRenderWindow()
-window.SetSize(499, 400)
+window.SetSize(512, 512)
 
 renderer = vtkRenderer()
 window.AddRenderer(renderer)
@@ -95,16 +106,16 @@ update_camera(renderer, camera)
 # -----------------------------------------------------------------------------
 
 # Create Image Builder
-vcdsb = SortedCompositeDataSetBuilder(dataset_destination_path % (nbSteps, halfSpread, window.GetSize()[0]), {'type': 'spherical', 'phi': [0], 'theta': [0]})
+vcdsb = SortedCompositeDataSetBuilder(dataset_destination_path % (nbSteps, step, window.GetSize()[0]), {'type': 'spherical', 'phi': range(0, 360, 30), 'theta': range(-60, 61, 30)})
 
 idx = 0
 vcdsb.start(window, renderer)
-for center in centers:
+for start in starts:
     idx += 1
-    updatePieceWise(scalarOpacity, fieldRange, center, halfSpread)
+    updatePieceWiseAsStep(scalarOpacity, fieldRange, start, step)
 
     # Capture layer
-    vcdsb.activateLayer(field, center)
+    vcdsb.activateLayer(field, start)
 
     # Write data
     vcdsb.writeData(mapper)

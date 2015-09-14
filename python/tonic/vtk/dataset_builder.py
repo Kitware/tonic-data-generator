@@ -307,8 +307,6 @@ class ConvertVolumeStackToSortedStack(object):
     def __init__(self, width, height):
         self.width = width
         self.height = height
-        self.textureSize = 0
-        self.texturePadding = 0
         self.layers = 0
 
     def convert(self, directory):
@@ -332,9 +330,6 @@ class ConvertVolumeStackToSortedStack(object):
         numberOfValues = self.width * self.height * len(layerNames)
         imageSize = self.width * self.height
         self.layers = len(layerNames)
-        self.textureSize = int(math.ceil(math.sqrt(numberOfValues)))
-        self.texturePadding = int((self.textureSize * self.textureSize) - numberOfValues)
-        paddingArray = buffer(bytearray(self.texturePadding))
 
         # Write all images as single buffer
         opacity = vtkUnsignedCharArray()
@@ -358,20 +353,18 @@ class ConvertVolumeStackToSortedStack(object):
             with open(depthPaths[layerNames[layer]], 'rb') as depthFile:
                 depthArrays.append(depthFile.read())
 
-        # Add opacity + padding
-        with open(os.path.join(directory, 'alpha.uint8'), 'wb') as alphaFile:
-            alphaFile.write(buffer(opacity))
-            alphaFile.write(paddingArray)
-
-        # Add intensity + padding
-        with open(os.path.join(directory, 'intensity.uint8'), 'wb') as intensityFile:
-            intensityFile.write(buffer(intensity))
-            intensityFile.write(paddingArray)
-
         # Apply pixel sorting
         destOrder = vtkUnsignedCharArray()
         destOrder.SetNumberOfComponents(1)
         destOrder.SetNumberOfTuples(numberOfValues)
+
+        opacityOrder = vtkUnsignedCharArray()
+        opacityOrder.SetNumberOfComponents(1)
+        opacityOrder.SetNumberOfTuples(numberOfValues)
+
+        intensityOrder = vtkUnsignedCharArray()
+        intensityOrder.SetNumberOfComponents(1)
+        intensityOrder.SetNumberOfTuples(numberOfValues)
 
         for pixelIdx in range(imageSize):
             depthStack = []
@@ -384,10 +377,17 @@ class ConvertVolumeStackToSortedStack(object):
 
                 # Copy Idx
                 destOrder.SetValue((imageSize * destLayerIdx) + pixelIdx, sourceLayerIdx)
+                opacityOrder.SetValue((imageSize * destLayerIdx) + pixelIdx, opacity.GetValue((imageSize * sourceLayerIdx) + pixelIdx))
+                intensityOrder.SetValue((imageSize * destLayerIdx) + pixelIdx, intensity.GetValue((imageSize * sourceLayerIdx) + pixelIdx))
+
+        with open(os.path.join(directory, 'alpha.uint8'), 'wb') as f:
+            f.write(buffer(opacityOrder))
+
+        with open(os.path.join(directory, 'intensity.uint8'), 'wb') as f:
+            f.write(buffer(intensityOrder))
 
         with open(os.path.join(directory, 'order.uint8'), 'wb') as f:
             f.write(buffer(destOrder))
-            f.write(paddingArray)
 
 
 class SortedCompositeDataSetBuilder(VolumeCompositeDataSetBuilder):
@@ -436,12 +436,7 @@ class SortedCompositeDataSetBuilder(VolumeCompositeDataSetBuilder):
             metadata['SortedComposite'] = {
                 'dimensions': metadata['CompositePipeline']['dimensions'],
                 'layers': self.dataConverter.layers,
-                'scalars': self.layerScalars[0:self.dataConverter.layers],
-                'textures': {
-                    'order'    : { 'size': self.dataConverter.textureSize },
-                    'alpha'    : { 'size': self.dataConverter.textureSize },
-                    'intensity': { 'size': self.dataConverter.textureSize }
-                }
+                'scalars': self.layerScalars[0:self.dataConverter.layers]
             }
 
             # Clean metadata
