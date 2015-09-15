@@ -114,9 +114,15 @@ class DataProberDataSetBuilder(DataSetBuilder):
     def writeData(self, time=0):
         self.resamplerFilter.UpdatePipeline(time)
         arrays = self.resamplerFilter.GetClientSideObject().GetOutput().GetPointData()
+        maskArray = arrays.GetArray('vtkValidPointMask')
         for field in self.fieldsToWrite:
             array = arrays.GetArray(field)
             if array:
+                # Push NaN when no value are present instead of 0
+                for idx in range(maskArray.GetNumberOfTuples()):
+                    if not maskArray.GetValue(idx):
+                        array.SetValue(idx, float('NaN'))
+
                 b = buffer(array)
                 with open(self.dataHandler.getDataAbsoluteFilePath(field), 'wb') as f:
                     f.write(b)
@@ -135,12 +141,21 @@ class DataProberDataSetBuilder(DataSetBuilder):
                 print 'No array for', field
                 print self.resamplerFilter.GetOutput()
 
-    def stop(self):
+    def stop(self, compress=True):
         # Push metadata
         self.dataHandler.addSection('DataProber', self.DataProber)
 
         # Write metadata
         DataSetBuilder.stop(self)
+
+        if compress:
+            for root, dirs, files in os.walk(self.dataHandler.getBasePath()):
+                print 'Compress', root
+                for name in files:
+                    if '.array' in name and '.gz' not in name:
+                        with open(os.path.join(root, name), 'rb') as f_in, gzip.open(os.path.join(root, name + '.gz'), 'wb') as f_out:
+                            shutil.copyfileobj(f_in, f_out)
+                        os.remove(os.path.join(root, name))
 
 
 # -----------------------------------------------------------------------------
@@ -238,9 +253,18 @@ class LayerDataSetBuilder(DataSetBuilder):
     def start(self):
         DataSetBuilder.start(self, self.view)
 
-    def stop(self):
+    def stop(self, compress=True):
         # Push metadata
         self.dataHandler.addSection('FloatImage', self.floatImage)
 
         # Write metadata
         DataSetBuilder.stop(self)
+
+        if compress:
+            for root, dirs, files in os.walk(self.dataHandler.getBasePath()):
+                print 'Compress', root
+                for name in files:
+                    if '.array' in name and '.gz' not in name:
+                        with open(os.path.join(root, name), 'rb') as f_in, gzip.open(os.path.join(root, name + '.gz'), 'wb') as f_out:
+                            shutil.copyfileobj(f_in, f_out)
+                        os.remove(os.path.join(root, name))

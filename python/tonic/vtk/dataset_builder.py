@@ -234,7 +234,7 @@ class VolumeCompositeDataSetBuilder(DataSetBuilder):
         DataSetBuilder.start(self, renderWindow, renderer)
         self.camera.updatePriority([2,1])
 
-    def stop(self):
+    def stop(self, compress=True):
         # Push metadata
         self.compositePipeline['dimensions'] = self.renderWindow.GetSize()
         self.compositePipeline['default_pipeline'] = 'A'.join(self.compositePipeline['layers']) + 'A'
@@ -242,6 +242,15 @@ class VolumeCompositeDataSetBuilder(DataSetBuilder):
 
         # Write metadata
         DataSetBuilder.stop(self)
+
+        if compress:
+            for root, dirs, files in os.walk(self.dataHandler.getBasePath()):
+                print 'Compress', root
+                for name in files:
+                    if '.uint8' in name and '.gz' not in name:
+                        with open(os.path.join(root, name), 'rb') as f_in, gzip.open(os.path.join(root, name + '.gz'), 'wb') as f_out:
+                            shutil.copyfileobj(f_in, f_out)
+                        os.remove(os.path.join(root, name))
 
 # -----------------------------------------------------------------------------
 # Data Prober Dataset Builder
@@ -293,12 +302,21 @@ class DataProberDataSetBuilder(DataSetBuilder):
                 print 'No array for', field
                 print self.resamplerFilter.GetOutput()
 
-    def stop(self):
+    def stop(self, compress=True):
         # Push metadata
         self.dataHandler.addSection('DataProber', self.DataProber)
 
         # Write metadata
         DataSetBuilder.stop(self)
+
+        if compress:
+            for root, dirs, files in os.walk(self.dataHandler.getBasePath()):
+                print 'Compress', root
+                for name in files:
+                    if '.array' in name and '.gz' not in name:
+                        with open(os.path.join(root, name), 'rb') as f_in, gzip.open(os.path.join(root, name + '.gz'), 'wb') as f_out:
+                            shutil.copyfileobj(f_in, f_out)
+                        os.remove(os.path.join(root, name))
 
 # -----------------------------------------------------------------------------
 # Sorted Composite Dataset Builder
@@ -419,7 +437,7 @@ class SortedCompositeDataSetBuilder(VolumeCompositeDataSetBuilder):
         self.dataHandler.getDataAbsoluteFilePath('intensity')
 
     def stop(self, clean=True, compress=True):
-        VolumeCompositeDataSetBuilder.stop(self)
+        VolumeCompositeDataSetBuilder.stop(self, compress=False)
 
         # Go through all directories and convert them
         for root, dirs, files in os.walk(self.dataHandler.getBasePath()):
