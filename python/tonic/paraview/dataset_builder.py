@@ -6,6 +6,8 @@ from tonic.paraview import data_writer
 
 from paraview import simple
 
+import json, os, math, gzip, shutil
+
 # Global helper variables
 encode_codes = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ'
 arrayTypesMapping = '  bBhHiIlLfd'
