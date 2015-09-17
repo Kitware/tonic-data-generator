@@ -3,6 +3,7 @@ from tonic.paraview import *
 from tonic.camera   import *
 
 from tonic.paraview import data_writer
+from tonic.paraview import data_converter
 
 from paraview import simple
 
@@ -270,3 +271,232 @@ class LayerDataSetBuilder(DataSetBuilder):
                         with open(os.path.join(root, name), 'rb') as f_in, gzip.open(os.path.join(root, name + '.gz'), 'wb') as f_out:
                             shutil.copyfileobj(f_in, f_out)
                         os.remove(os.path.join(root, name))
+
+
+# -----------------------------------------------------------------------------
+# Composite Dataset Builder
+# -----------------------------------------------------------------------------
+
+class CompositeDataSetBuilder(DataSetBuilder):
+    def __init__(self, location, sceneConfig, cameraInfo, metadata={}):
+        DataSetBuilder.__init__(self, location, cameraInfo, metadata)
+
+        simple.LoadDistributedPlugin('RGBZView')
+        self.view = simple.CreateView("RGBZView")
+        self.view.ImageFormatExtension = 'png' # Only option for scalar data
+        self.view.ViewSize = sceneConfig['size']
+        self.view.CenterAxesVisibility = 0
+        self.view.OrientationAxesVisibility = 0
+        self.view.UpdatePropertyInformation()
+
+        # Initialize camera
+        for key, value in sceneConfig['camera'].iteritems():
+            self.view.GetProperty(key).SetData(value)
+
+        # Create a representation for all scene sources
+        self.config = sceneConfig
+        self.representations = []
+        for data in self.config['scene']:
+            rep = simple.Show(data['source'], self.view)
+            self.representations.append(rep)
+
+        # Add directory path
+        self.dataHandler.registerData(name='directory', fileName='/file.txt', categories=['trash'])
+        self.offsetMap = {}
+
+    def start(self):
+        DataSetBuilder.start(self, self.view)
+
+    def stop(self, compress=True, clean=True):
+        DataSetBuilder.stop(self)
+
+        with open(os.path.join(self.dataHandler.getBasePath(), "offset.json"), 'w') as f:
+            f.write(json.dumps(self.offsetMap))
+
+        # Make the config serializable
+        for item in self.config['scene']:
+            del item['source']
+
+        # Write the scene to disk
+        with open(os.path.join(self.dataHandler.getBasePath(), "config.json"), 'w') as f:
+            f.write(json.dumps(self.config))
+
+        dataConverter = data_converter.ConvertCompositeSpriteToSortedStack(self.dataHandler.getBasePath())
+        dataConverter.convert()
+
+        # Create new info.json
+        os.remove(os.path.join(self.dataHandler.getBasePath(), "offset.json"))
+        os.remove(os.path.join(self.dataHandler.getBasePath(), "info.json"))
+        os.remove(os.path.join(self.dataHandler.getBasePath(), "config.json"))
+
+        # Clean scene in config and gather ranges
+        dataRanges = {}
+        for layer in self.config['scene']:
+            colorByList = []
+            for color in layer['colors']:
+                values = None
+                if 'constant' in layer['colors'][color]:
+                    value = layer['colors'][color]['constant']
+                    values = [ value, value ]
+                    colorByList.append({'name': color, 'type': 'const', 'value': value})
+                elif 'range' in layer['colors'][color]:
+                    values = layer['colors'][color]['range']
+                    colorByList.append({'name': color, 'type': 'field'})
+
+                if values:
+                    if color not in dataRanges:
+                        dataRanges[color] = values
+                    else:
+                        dataRanges[color][0] = min(dataRanges[color][0], values[0], values[1])
+                        dataRanges[color][1] = max(dataRanges[color][1], values[0], values[1])
+
+            layer['colorBy'] = colorByList
+            del layer['colors']
+
+        sortedCompositeSection = {
+            'dimensions': self.config['size'],
+            'pipeline': self.config['scene'],
+            'ranges': dataRanges,
+            'layers': len(self.config['scene'])
+        }
+        self.dataHandler.addSection('SortedComposite', sortedCompositeSection)
+        self.dataHandler.addTypes('sorted-composite', 'multi-color-by')
+
+        self.dataHandler.removeData('directory')
+        for dataToRegister in dataConverter.listData():
+            self.dataHandler.registerData(**dataToRegister)
+
+        self.dataHandler.writeDataDescriptor()
+
+        if clean:
+            for root, dirs, files in os.walk(self.dataHandler.getBasePath()):
+                print 'Clean', root
+                for name in files:
+                    if name in ['camera.json', 'composite.json', 'query.json', 'rgb.png']:
+                        os.remove(os.path.join(root, name))
+
+        if compress:
+            for root, dirs, files in os.walk(self.dataHandler.getBasePath()):
+                print 'Compress', root
+                for name in files:
+                    if ('.float32' in name or '.uint8' in name) and '.gz' not in name:
+                        with open(os.path.join(root, name), 'rb') as f_in, gzip.open(os.path.join(root, name + '.gz'), 'wb') as f_out:
+                            shutil.copyfileobj(f_in, f_out)
+                        os.remove(os.path.join(root, name))
+
+    def writeData(self):
+        # Fix camera bounds
+        simple.Render(self.view)
+        self.view.ResetClippingBounds()
+        self.view.FreezeGeometryBounds()
+        self.view.UpdatePropertyInformation()
+        self.view.Background = [0,0,0]
+
+        # Compute the number of images by stack
+        nbImages = 0
+        nbLightImagePerLayer = 0
+        for item in self.config['scene']:
+            for key, value in item['colors'].iteritems():
+                if 'constant' not in value:
+                    nbImages += 1
+
+        if 'intensity' in self.config['light']:
+            nbLightImagePerLayer += 1
+
+        if 'normal' in self.config['light']:
+            nbLightImagePerLayer += 3
+
+        nbImages += len(self.config['scene']) * nbLightImagePerLayer
+        nbImages += 1 # Background
+
+        # Generate the heavy data
+        composite_size = len(self.representations)
+        for camPos in self.getCamera():
+            self.view.CameraFocalPoint = camPos['focalPoint']
+            self.view.CameraPosition = camPos['position']
+            self.view.CameraViewUp = camPos['viewUp']
+
+            # Update destination directory
+            dest_path = os.path.dirname(self.dataHandler.getDataAbsoluteFilePath('directory'))
+
+            # Write camera informations
+            with open(os.path.join(dest_path, "camera.json"), 'w') as f:
+                f.write(json.dumps(camPos))
+
+            # Extract images for each fields
+            self.view.ResetActiveImageStack()
+            self.view.RGBStackSize = nbImages
+            offset_value = 1
+            for compositeIdx in range(composite_size):
+                rep = self.representations[compositeIdx]
+                index = 0
+
+                # Prevent color interference
+                rep.DiffuseColor = [1,1,1]
+
+                # Handle light
+                for lightType in self.config['light']:
+                    if lightType == 'intensity':
+                        index += 1
+                        rep.AmbientColor  = [1,1,1]
+                        rep.SpecularColor = [1,1,1]
+
+                        self.view.CompositeDirectory = dest_path
+                        self.view.ActiveRepresentation = rep
+                        self.view.CaptureActiveRepresentation()
+
+                        self.offsetMap['%d|%s' % (compositeIdx, 'intensity')] = offset_value
+                        offset_value += 1
+
+                    if lightType == 'normal':
+                        for comp in range(3):
+                            index += 1
+
+                            self.view.CompositeDirectory = dest_path
+                            self.view.ActiveRepresentation = rep
+
+                            # Configure view to handle POINT_DATA / CELL_DATA
+                            self.view.SetDrawCells = 0
+                            self.view.SetArrayNameToDraw = 'Normals'
+                            self.view.SetArrayComponentToDraw = comp
+                            self.view.SetScalarRange = [-1.0, 1.0]
+                            self.view.StartCaptureValues()
+                            self.view.CaptureActiveRepresentation()
+                            self.view.StopCaptureValues()
+
+                            self.offsetMap['%d|%s|%d' % (compositeIdx, 'normal', comp)] = offset_value
+                            offset_value += 1
+
+
+                # Handle color by
+                for fieldName, fieldConfig in self.config['scene'][compositeIdx]['colors'].iteritems():
+                    index += 1
+                    if 'constant' in fieldConfig:
+                        # Skip nothing to render
+                        index -= 1
+                        continue
+
+                    self.view.CompositeDirectory = dest_path
+                    self.view.ActiveRepresentation = rep
+
+                    # Configure view to handle POINT_DATA / CELL_DATA
+                    if fieldConfig['location'] == 'POINT_DATA':
+                        self.view.SetDrawCells = 0
+                        self.view.SetArrayNameToDraw = fieldName
+                    else:
+                        self.view.SetDrawCells = 1
+                        self.view.SetArrayNameToDraw = fieldName
+
+                    self.view.SetArrayComponentToDraw = 0
+                    self.view.SetScalarRange = fieldConfig['range']
+                    self.view.StartCaptureValues()
+                    self.view.CaptureActiveRepresentation()
+                    self.view.StopCaptureValues()
+
+                    self.offsetMap['%d|%s' % (compositeIdx, fieldName)] = offset_value
+                    offset_value += 1
+
+            # Extract RGB + Z-buffer
+            self.view.WriteImage()
+            self.view.ComputeZOrdering()
+            self.view.WriteComposite()

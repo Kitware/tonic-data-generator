@@ -73,6 +73,9 @@ class DataHandler(object):
         for key, value in kwargs.iteritems():
             self.current[key] = value
 
+    def removeData(self, name):
+        del self.data[name]
+
     def registerData(self, **kwargs):
         """
         name, type, mimeType, fileName, dependencies
@@ -118,6 +121,16 @@ class DataHandler(object):
     def addSection(self, key, value):
         self.sections[key] = value
 
+    def computeDataPatterns(self):
+        if self.basePattern == None:
+            self.updateBasePattern()
+
+        for name in self.data:
+            dataPattern = self.data[name]['pattern']
+            if '{pattern}' in dataPattern:
+                dataPattern = dataPattern.replace('{pattern}', self.basePattern)
+                self.data[name]['pattern'] = dataPattern
+
     def __getattr__(self, name):
         if self.basePattern == None:
             self.updateBasePattern()
@@ -129,6 +142,8 @@ class DataHandler(object):
     def writeDataDescriptor(self):
         if not self.can_write:
             return
+
+        self.computeDataPatterns()
 
         jsonData = {
             "arguments_order" : self.argOrder,

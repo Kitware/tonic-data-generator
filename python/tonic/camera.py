@@ -65,6 +65,9 @@ class SphericalCamera(object):
         self.thetaBind = { "mouse" : { "drag" : { "modifier": 0, "coordinate": 1, "step": 30 , "orientation": 1} } }
         self.phiBind = { "mouse" : { "drag" : { "modifier": 0, "coordinate": 0, "step": 30 , "orientation": 1} } }
 
+        # Convert to serializable type
+        fp = tuple(i for i in focalPoint)
+
         # Register arguments to the data handler
         if len(phiAngles) > 1 and phiAngles[-1] + phiAngles[1] == 360:
             self.dataHandler.registerArgument(priority=0, name='phi', values=phiAngles, ui='slider', loop='modulo', bind=self.phiBind)
@@ -83,9 +86,9 @@ class SphericalCamera(object):
         # Compute all camera settings
         for theta in thetaAngles:
             for phi in phiAngles:
-                phiPos = rotate(phiAxis, -phi, focalPoint, position)
-                thetaAxis = vectProduct(phiAxis, tuple(focalPoint[i]-phiPos[i] for i in range(3)))
-                thetaPhiPos = rotate(thetaAxis, theta, focalPoint, phiPos)
+                phiPos = rotate(phiAxis, -phi, fp, position)
+                thetaAxis = vectProduct(phiAxis, tuple(fp[i]-phiPos[i] for i in range(3)))
+                thetaPhiPos = rotate(thetaAxis, theta, fp, phiPos)
                 viewUp = rotate(thetaAxis, theta, (0,0,0), phiAxis)
 
                 self.cameraSettings.append({
@@ -93,7 +96,7 @@ class SphericalCamera(object):
                     'thetaIdx': thetaAngles.index(theta),
                     'phi': phi,
                     'phiIdx': phiAngles.index(phi),
-                    'focalPoint': focalPoint,
+                    'focalPoint': fp,
                     'position': thetaPhiPos,
                     'viewUp': viewUp
                 })
