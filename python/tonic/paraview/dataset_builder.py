@@ -177,6 +177,11 @@ class DataProberDataSetBuilder(DataSetBuilder):
             self.DataProber['ranges'][field] = [array.GetRange()[0], array.GetRange()[1]]
 
     def stop(self, compress=True):
+        # Rescale spacing to have the smaller value to be 1.0
+        smallerValue = min(self.DataProber['spacing'])
+        if smallerValue < 1.0:
+            self.DataProber['spacing'] = tuple( i / smallerValue for i in self.DataProber['spacing'])
+
         # Push metadata
         self.dataHandler.addSection('DataProber', self.DataProber)
 
