@@ -116,33 +116,65 @@ class DataProberDataSetBuilder(DataSetBuilder):
 
     def writeData(self, time=0):
         self.resamplerFilter.UpdatePipeline(time)
-        arrays = self.resamplerFilter.GetClientSideObject().GetOutput().GetPointData()
+        imageData = self.resamplerFilter.GetClientSideObject().GetOutput()
+        self.DataProber['spacing'] = imageData.GetSpacing()
+        arrays = imageData.GetPointData()
         maskArray = arrays.GetArray('vtkValidPointMask')
         for field in self.fieldsToWrite:
             array = arrays.GetArray(field)
             if array:
-                # Push NaN when no value are present instead of 0
-                for idx in range(maskArray.GetNumberOfTuples()):
-                    if not maskArray.GetValue(idx):
-                        array.SetValue(idx, float('NaN'))
+                if array.GetNumberOfComponents() == 1:
+                    # Push NaN when no value are present instead of 0
+                    for idx in range(maskArray.GetNumberOfTuples()):
+                        if not maskArray.GetValue(idx):
+                            array.SetValue(idx, float('NaN'))
 
-                b = buffer(array)
-                with open(self.dataHandler.getDataAbsoluteFilePath(field), 'wb') as f:
-                    f.write(b)
+                    with open(self.dataHandler.getDataAbsoluteFilePath(field), 'wb') as f:
+                        f.write(buffer(array))
 
-                self.DataProber['types'][field] = jsMapping[arrayTypesMapping[array.GetDataType()]]
-                if field in self.DataProber['ranges']:
-                    dataRange = array.GetRange()
-                    if dataRange[0] < self.DataProber['ranges'][field][0]:
-                        self.DataProber['ranges'][field][0] = dataRange[0]
-                    if dataRange[1] > self.DataProber['ranges'][field][1]:
-                        self.DataProber['ranges'][field][1] = dataRange[1]
+                    self.expandRange(array)
                 else:
-                    self.DataProber['ranges'][field] = [array.GetRange()[0], array.GetRange()[1]]
+                    magarray = array.NewInstance()
+                    magarray.SetNumberOfTuples(array.GetNumberOfTuples())
+                    magarray.SetName(field)
 
+                    for idx in range(magarray.GetNumberOfTuples()):
+                        if not maskArray.GetValue(idx):
+                            # Push NaN when no value are present
+                            magarray.SetValue(idx, float('NaN'))
+                        else:
+                            entry = array.GetTuple(idx)
+                            mag = self.magnitude(entry)
+                            magarray.SetValue(idx,mag)
+
+                    with open(self.dataHandler.getDataAbsoluteFilePath(field), 'wb') as f:
+                        f.write(buffer(magarray))
+
+                    self.expandRange(magarray)
             else:
                 print 'No array for', field
                 print self.resamplerFilter.GetOutput()
+
+    def magnitude(self, tuple):
+        value = 0
+        for item in tuple:
+            value += item * item
+        value = value**0.5
+
+        return value
+
+    def expandRange(self, array):
+        field = array.GetName()
+        self.DataProber['types'][field] = jsMapping[arrayTypesMapping[array.GetDataType()]]
+
+        if field in self.DataProber['ranges']:
+            dataRange = array.GetRange()
+            if dataRange[0] < self.DataProber['ranges'][field][0]:
+                self.DataProber['ranges'][field][0] = dataRange[0]
+            if dataRange[1] > self.DataProber['ranges'][field][1]:
+                self.DataProber['ranges'][field][1] = dataRange[1]
+        else:
+            self.DataProber['ranges'][field] = [array.GetRange()[0], array.GetRange()[1]]
 
     def stop(self, compress=True):
         # Push metadata
