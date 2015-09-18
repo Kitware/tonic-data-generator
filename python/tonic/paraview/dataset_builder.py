@@ -366,11 +366,56 @@ class CompositeDataSetBuilder(DataSetBuilder):
         os.remove(os.path.join(self.dataHandler.getBasePath(), "info.json"))
         os.remove(os.path.join(self.dataHandler.getBasePath(), "config.json"))
 
+        # Composite pipeline meta description
+        compositePipeline = {
+            'default_pipeline': '',
+            'layers': [],
+            'fields': {},
+            'layer_fields': {},
+            'pipeline': []
+        }
+        rootItems = {}
+        fieldNameMapping = {}
+
         # Clean scene in config and gather ranges
         dataRanges = {}
+        layerIdx = 0
         for layer in self.config['scene']:
+            # Create group node if any
+            if 'parent' in layer and layer['parent'] not in rootItems:
+                rootItems[layer['parent']] = { 'name': layer['parent'], 'ids': [], 'children': [] }
+                compositePipeline['pipeline'].append(rootItems[layer['parent']])
+
+            # Create layer entry
+            layerCode = encode_codes[layerIdx]
+            layerItem = { 'name': layer['name'], 'ids': [ layerCode ]}
+            compositePipeline['layers'].append(layerCode)
+            compositePipeline['layer_fields'][layerCode] = []
+            compositePipeline['default_pipeline'] += layerCode
+
+            # Register layer entry in pipeline
+            if 'parent' in layer:
+                rootItems[layer['parent']]['children'].append(layerItem)
+                rootItems[layer['parent']]['ids'].append(layerCode)
+            else:
+                compositePipeline['pipeline'].append(layerItem)
+
+            # Handle color / field
             colorByList = []
             for color in layer['colors']:
+                # Find color code
+                if color not in fieldNameMapping:
+                    colorCode = encode_codes[len(fieldNameMapping)]
+                    fieldNameMapping[color] = colorCode
+                    compositePipeline['fields'][colorCode] = color
+                else:
+                    colorCode = fieldNameMapping[color]
+
+                # Register color code
+                compositePipeline['layer_fields'][layerCode].append(colorCode)
+                if len(colorByList) == 0:
+                    compositePipeline['default_pipeline'] += colorCode
+
                 values = None
                 if 'constant' in layer['colors'][color]:
                     value = layer['colors'][color]['constant']
@@ -389,6 +434,7 @@ class CompositeDataSetBuilder(DataSetBuilder):
 
             layer['colorBy'] = colorByList
             del layer['colors']
+            layerIdx += 1
 
         sortedCompositeSection = {
             'dimensions': self.config['size'],
@@ -397,6 +443,7 @@ class CompositeDataSetBuilder(DataSetBuilder):
             'layers': len(self.config['scene'])
         }
         self.dataHandler.addSection('SortedComposite', sortedCompositeSection)
+        self.dataHandler.addSection('CompositePipeline', compositePipeline)
         self.dataHandler.addTypes('sorted-composite', 'multi-color-by')
 
         self.dataHandler.removeData('directory')

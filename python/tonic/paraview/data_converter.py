@@ -34,13 +34,16 @@ class CompositeJSON(object):
 
         idx = 0
         for pixel in self.pixels:
+            x = (idx % self.width)
+            y = (idx / self.width)
+            flipYIdx = self.width * (self.height - y - 1) + x
             if '@' in pixel:
                 idx += int(pixel[1:])
             else:
                 # Need to decode the order
                 layerIdx = 0
                 for layer in pixel:
-                    sortedOrder.SetValue(idx + self.imageSize * layerIdx, self.encoding.index(layer))
+                    sortedOrder.SetValue(flipYIdx + self.imageSize * layerIdx, self.encoding.index(layer))
                     layerIdx += 1
 
                 # Move to next pixel
@@ -118,16 +121,26 @@ class ConvertCompositeSpriteToSortedStack(object):
             sortedIntensity = vtkUnsignedCharArray()
             sortedIntensity.SetNumberOfTuples(stackSize)
 
-            for layer in self.layers:
-                intensityOffsets.append(layer['intensity'])
+            # for layer in self.layers:
+            #     intensityOffsets.append(layer['intensity'])
 
-            for idx in range(stackSize):
-                layerIdx = orderArray.GetValue(idx)
-                if layerIdx == 255:
-                    sortedIntensity.SetValue(idx, 0)
-                else:
-                    offset = 3 * intensityOffsets[layerIdx] * imageSize
-                    sortedIntensity.SetValue(idx, rgbArray.GetValue(idx * 3 + offset))
+            # print 'intensityOffsets', intensityOffsets
+
+            # for idx in range(stackSize):
+            #     layerIdx = orderArray.GetValue(idx)
+            #     if layerIdx == 255:
+            #         sortedIntensity.SetValue(idx, 0)
+            #     else:
+            #         offset = 3 * intensityOffsets[layerIdx] * imageSize
+            #         sortedIntensity.SetValue(idx, rgbArray.GetValue(idx * 3 + offset))
+
+
+            layerIdx = 0
+            for layer in self.layers:
+                offset = 3 * layer['intensity'] * imageSize
+                for idx in range(imageSize):
+                    sortedIntensity.SetValue(layerIdx * imageSize + idx, rgbArray.GetValue(idx * 3 + offset))
+                layerIdx += 1
 
             with open(os.path.join(directory, 'intensity.uint8'), 'wb') as f:
                 f.write(buffer(sortedIntensity))
@@ -140,22 +153,24 @@ class ConvertCompositeSpriteToSortedStack(object):
                 if scalar not in ['intensity', 'normal']:
                     offset = imageSize * layer[scalar]
                     scalarRange = self.config['scene'][layerIdx]['colors'][scalar]['range']
-                    delta = float(scalarRange[1] - scalarRange[0]) / 16777215.0
+                    delta = (scalarRange[1] - scalarRange[0]) / 16777215.0 # 2^24 - 1 => 16,777,215
+
+                    # if scalar == 'Temp' and layerIdx == 0:
+                    #     print "Data Range: ", scalarRange
+                    #     print "Delta: ", delta
 
                     scalarArray = vtkFloatArray()
                     scalarArray.SetNumberOfTuples(imageSize)
                     for idx in range(imageSize):
                         rgb = rgbArray.GetTuple(idx + offset)
-                        if rgb[0] == 0 and rgb[1] == 0 and rgb[2] == 0:
+                        if rgb[0] != 0 or rgb[1] != 0 or rgb[2] != 0:
+                            # Decode encoded value
+                            value = scalarRange[0] + delta * float(rgb[0]*65536 + rgb[1]*256 + rgb[2] - 1)
+                            scalarArray.SetValue(idx, value)
+                        else:
                             # No value
                             scalarArray.SetValue(idx, float('NaN'))
-                        else:
-                            # Decode encoded value
-                            value = 0.0
-                            value = float(rgb[0] + rgb[1] * 256 + rgb[2] * 256 * 256) - 1.0
-                            value *= delta
-                            value += scalarRange[0]
-                            scalarArray.SetValue(idx, float(value))
+
 
                     with open(os.path.join(directory, '%d_%s.float32' % (layerIdx, scalar)), 'wb') as f:
                         f.write(buffer(scalarArray))

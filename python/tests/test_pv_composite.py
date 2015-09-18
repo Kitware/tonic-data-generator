@@ -26,6 +26,9 @@ from tonic.paraview.dataset_builder import *
 reader = simple.OpenDataFile(inputFile)
 reader.PointVariables = ['Temp', 'V', 'Pres', 'AsH3', 'GaMe3', 'CH4', 'H2']
 
+clip = simple.Clip(Input=reader)
+clip.ClipType.Normal = [0.0, 1.0, 0.0]
+
 streamLines = simple.StreamTracer(
     Input = reader,
     SeedType="High Resolution Line Source",
@@ -46,6 +49,13 @@ sceneDescription = {
         {
             'name': 'Stream lines',
             'source': simple.Tube(Input=streamLines, Radius = 0.2),
+            'colors': {
+                'Pres': {'location': 'POINT_DATA', 'range': Pres_range },
+                'Temp': {'location': 'POINT_DATA', 'range': Temp_range }
+            }
+        },{
+            'name': 'Clip',
+            'source': clip,
             'colors': {
                 'Pres': {'location': 'POINT_DATA', 'range': Pres_range },
                 'Temp': {'location': 'POINT_DATA', 'range': Temp_range }
