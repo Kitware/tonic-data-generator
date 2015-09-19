@@ -39,7 +39,7 @@ streamLines.SeedType.Point1 = [-5.75, -5.75, -10.0]
 
 sceneDescription = {
     'size': [500, 500],
-    'light': [ 'intensity', 'normal' ],
+    'light': [ 'intensity' ], # 'normal'
     'camera': {
         'CameraViewUp': [0.0, 0.0, 1.0],
         'CameraPosition': [0.0, -58.47, 0.07],

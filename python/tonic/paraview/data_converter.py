@@ -24,8 +24,20 @@ class CompositeJSON(object):
     def getStackSize(self):
         return self.stackSize
 
+    def writeOrderSprite(self,path):
+        ds = vtkImageData()
+        ds.SetDimensions(self.width, self.height, self.nbLayers)
+        ds.GetPointData().AddArray(self.getSortedOrderArray())
+
+        writer = vtkDataSetWriter()
+        writer.SetInputData(ds)
+        writer.SetFileName(path)
+        writer.Update()
+
+
     def getSortedOrderArray(self):
         sortedOrder = vtkUnsignedCharArray()
+        sortedOrder.SetName('layerIdx');
         sortedOrder.SetNumberOfTuples(self.stackSize)
 
         # Reset content
@@ -121,26 +133,17 @@ class ConvertCompositeSpriteToSortedStack(object):
             sortedIntensity = vtkUnsignedCharArray()
             sortedIntensity.SetNumberOfTuples(stackSize)
 
-            # for layer in self.layers:
-            #     intensityOffsets.append(layer['intensity'])
-
-            # print 'intensityOffsets', intensityOffsets
-
-            # for idx in range(stackSize):
-            #     layerIdx = orderArray.GetValue(idx)
-            #     if layerIdx == 255:
-            #         sortedIntensity.SetValue(idx, 0)
-            #     else:
-            #         offset = 3 * intensityOffsets[layerIdx] * imageSize
-            #         sortedIntensity.SetValue(idx, rgbArray.GetValue(idx * 3 + offset))
-
-
-            layerIdx = 0
             for layer in self.layers:
-                offset = 3 * layer['intensity'] * imageSize
-                for idx in range(imageSize):
-                    sortedIntensity.SetValue(layerIdx * imageSize + idx, rgbArray.GetValue(idx * 3 + offset))
-                layerIdx += 1
+                intensityOffsets.append(layer['intensity'])
+
+            for idx in range(stackSize):
+                layerIdx = int(orderArray.GetValue(idx))
+                if layerIdx == 255:
+                    sortedIntensity.SetValue(idx, 255)
+                else:
+                    offset = 3 * intensityOffsets[layerIdx] * imageSize
+                    imageIdx = idx % imageSize
+                    sortedIntensity.SetValue(idx, rgbArray.GetValue(imageIdx * 3 + offset))
 
             with open(os.path.join(directory, 'intensity.uint8'), 'wb') as f:
                 f.write(buffer(sortedIntensity))
@@ -154,10 +157,6 @@ class ConvertCompositeSpriteToSortedStack(object):
                     offset = imageSize * layer[scalar]
                     scalarRange = self.config['scene'][layerIdx]['colors'][scalar]['range']
                     delta = (scalarRange[1] - scalarRange[0]) / 16777215.0 # 2^24 - 1 => 16,777,215
-
-                    # if scalar == 'Temp' and layerIdx == 0:
-                    #     print "Data Range: ", scalarRange
-                    #     print "Delta: ", delta
 
                     scalarArray = vtkFloatArray()
                     scalarArray.SetNumberOfTuples(imageSize)
