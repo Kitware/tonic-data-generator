@@ -40,7 +40,7 @@ sceneDescription = {
     'light': [ 'intensity', 'normal' ],
     'camera': {
         'CameraViewUp': [0.0, 0.0, 1.0],
-        'CameraPosition': [107823.5, -46073770.81765442, -44044.25],
+        'CameraPosition': [107823.5, -28000000, -44044.25],
         'CameraFocalPoint': [107823.5, -7766.0, -44044.25]
     },
     'scene': [
