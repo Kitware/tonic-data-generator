@@ -315,8 +315,8 @@ class LayerDataSetBuilder(DataSetBuilder):
 # -----------------------------------------------------------------------------
 
 class CompositeDataSetBuilder(DataSetBuilder):
-    def __init__(self, location, sceneConfig, cameraInfo, metadata={}):
-        DataSetBuilder.__init__(self, location, cameraInfo, metadata)
+    def __init__(self, location, sceneConfig, cameraInfo, metadata={}, sections={}):
+        DataSetBuilder.__init__(self, location, cameraInfo, metadata, sections)
 
         simple.LoadDistributedPlugin('RGBZView')
         self.view = simple.CreateView("RGBZView")

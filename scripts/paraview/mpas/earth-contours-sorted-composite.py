@@ -16,6 +16,14 @@ dataRanges = {
     'temperature': [-1.64296, 28.6918]
 }
 
+sections = {
+    'LookupTables': {
+        "bottomDepth": { "preset": "earth"},
+        "temperature": { "preset": "ocean", "range": [5, 30]},
+        "salinity"   : { "preset": "yellow2brown", "range": [34, 38]}
+    }
+}
+
 # -----------------------------------------------------------------------------
 
 from paraview import simple
@@ -52,7 +60,7 @@ sceneDescription = {
             }
         },{
             'parent': 'Temperatures',
-            'name': '5&#8451;',
+            'name': '5C',
             'source': simple.Contour(
                             Input = dataToPoints,
                             PointMergeMethod = "Uniform Binning",
@@ -64,7 +72,7 @@ sceneDescription = {
             }
         },{
             'parent': 'Temperatures',
-            'name': '10&#8451;',
+            'name': '10C',
             'source': simple.Contour(
                             Input = dataToPoints,
                             PointMergeMethod = "Uniform Binning",
@@ -76,7 +84,7 @@ sceneDescription = {
             }
         },{
             'parent': 'Temperatures',
-            'name': '15&#8451;',
+            'name': '15C',
             'source': simple.Contour(
                             Input = dataToPoints,
                             PointMergeMethod = "Uniform Binning",
@@ -88,7 +96,7 @@ sceneDescription = {
             }
         },{
             'parent': 'Temperatures',
-            'name': '20&#8451;',
+            'name': '20C',
             'source': simple.Contour(
                             Input = dataToPoints,
                             PointMergeMethod = "Uniform Binning",
@@ -100,7 +108,7 @@ sceneDescription = {
             }
         },{
             'parent': 'Temperatures',
-            'name': '25&#8451;',
+            'name': '25C',
             'source': simple.Contour(
                             Input = dataToPoints,
                             PointMergeMethod = "Uniform Binning",
@@ -119,7 +127,7 @@ sceneDescription = {
 # -----------------------------------------------------------------------------
 
 # Create Image Builder
-dsb = CompositeDataSetBuilder(outputDir, sceneDescription, {'type': 'spherical', 'phi': phi, 'theta': theta})
+dsb = CompositeDataSetBuilder(outputDir, sceneDescription, {'type': 'spherical', 'phi': phi, 'theta': theta}, sections=sections)
 
 # Add time information
 dsb.getDataHandler().registerArgument(priority=1, name='time', values=time, ui='slider', loop='modulo')
