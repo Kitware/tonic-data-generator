@@ -182,7 +182,11 @@ class ConvertCompositeSpriteToSortedStack(object):
                     if not math.isnan(vect[0]):
                         rotation = axisangle_to_q(rotAxis, angle)
                         rVect = qv_mult(rotation, vect)
-                        normalByLayer.SetTuple3(layerIdx * imageSize + idx, rVect[0], rVect[1], math.abs(rVect[2])) # Always toward camera
+                        # Need to reverse vector ?
+                        if rVect[2] < 0:
+                            normalByLayer.SetTuple3(layerIdx * imageSize + idx, -rVect[0], -rVect[1], -rVect[2])
+                        else:
+                            normalByLayer.SetTuple3(layerIdx * imageSize + idx, rVect[0], rVect[1], rVect[2])
 
                 layerIdx += 1
 
