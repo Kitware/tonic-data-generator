@@ -2,14 +2,16 @@
 # User configuration
 # -----------------------------------------------------------------------------
 
-dataset_destination_path = '/Users/seb/Desktop/mpas_flat_earth_prober'
-source_filename = '/Volumes/Backup3TB/DataExploration/Data/MPAS/data/flat_n_primal/LON_LAT_NLAYER-primal_%d_0.vtu'
+# dataset_destination_path = '/Users/seb/Desktop/mpas_flat_earth_prober'
+# source_filename = '/Volumes/Backup3TB/DataExploration/Data/MPAS/data/flat_n_primal/LON_LAT_NLAYER-primal_%d_0.vtu'
+dataset_destination_path = '/Volumes/KSW-Data/mpas_flat_earth_prober-raw'
+source_filename          = '/Volumes/KSW-Data/Data/DataExploration/Data/MPAS/data/flat_n_primal/LON_LAT_NLAYER-primal_%d_0.vtu'
 
-all_time_serie = range(50, 7201, 50)
-quick_time_serie = range(100, 7201, 200)
+all_time_serie = range(50, 5151, 50)
+quick_time_serie = range(100, 5151, 200)
 single_time_serie = [ 50 ]
 
-time_serie = single_time_serie
+time_serie = all_time_serie
 
 sampling_arrays = ['temperature', 'salinity']
 sampling_size   = [ 500, 250, 30 ]
