@@ -52,7 +52,7 @@ sceneDescription = {
             }
         },{
             'parent': 'Temperatures',
-            'name': '5\ua8451',
+            'name': '5&#8451;',
             'source': simple.Contour(
                             Input = dataToPoints,
                             PointMergeMethod = "Uniform Binning",
@@ -64,7 +64,7 @@ sceneDescription = {
             }
         },{
             'parent': 'Temperatures',
-            'name': '10\ua8451',
+            'name': '10&#8451;',
             'source': simple.Contour(
                             Input = dataToPoints,
                             PointMergeMethod = "Uniform Binning",
@@ -76,7 +76,7 @@ sceneDescription = {
             }
         },{
             'parent': 'Temperatures',
-            'name': '15\ua8451',
+            'name': '15&#8451;',
             'source': simple.Contour(
                             Input = dataToPoints,
                             PointMergeMethod = "Uniform Binning",
@@ -88,7 +88,7 @@ sceneDescription = {
             }
         },{
             'parent': 'Temperatures',
-            'name': '20\ua8451',
+            'name': '20&#8451;',
             'source': simple.Contour(
                             Input = dataToPoints,
                             PointMergeMethod = "Uniform Binning",
@@ -100,7 +100,7 @@ sceneDescription = {
             }
         },{
             'parent': 'Temperatures',
-            'name': '25\ua8451',
+            'name': '25&#8451;',
             'source': simple.Contour(
                             Input = dataToPoints,
                             PointMergeMethod = "Uniform Binning",
@@ -121,8 +121,11 @@ sceneDescription = {
 # Create Image Builder
 dsb = CompositeDataSetBuilder(outputDir, sceneDescription, {'type': 'spherical', 'phi': phi, 'theta': theta})
 
+# Add time information
+dsb.getDataHandler().registerArgument(priority=1, name='time', values=time, ui='slider', loop='modulo')
+
 dsb.start()
-for t in time:
+for t in dsb.getDataHandler().time:
     reader.FileName = inputFile % t
     dsb.writeData()
 dsb.stop()
