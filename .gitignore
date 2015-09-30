@@ -1,2 +1,3 @@
 *.pyc
 .npmrc
+node_modules
