@@ -200,7 +200,7 @@ class ConvertCompositeSpriteToSortedStack(object):
                     offset = layerIdx * imageSize
                     imageIdx = idx % imageSize
                     vect = normalByLayer.GetTuple3(imageIdx + offset)
-                    sortedNormal.SetTuple3(idx, int(127.5 * (vect[0] + 1)), int(127.5 * (vect[1] + 1)), int(255 * vect[0]))
+                    sortedNormal.SetTuple3(idx, int(127.5 * (vect[0] + 1)), int(127.5 * (vect[1] + 1)), int(255 * vect[2]))
 
             # Write the sorted data
             with open(os.path.join(directory, 'normal.uint8'), 'wb') as f:
