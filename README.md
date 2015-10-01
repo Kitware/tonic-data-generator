@@ -7,16 +7,37 @@ its usage within ParaView.
 
 ## Installation
 
+First you should let __tonic-data-generator__ know where you want to deploy the
+tonic python module and which executable should be used.
+
+To do that locally, you can just export those variables, but it might be more
+useful to set them up globally in your ~/.bashrc or ~/.profile.
+
 ```sh
-$ npm install -g tonic-data-generator
-$ tonic-install-py ${destination_directory_path}
+# OS X using installed ParaView inside /Applications
+$ export TONIC_PYTHON_PATH=/Applications/paraview.app/Contents/Python
+
+# OS X + Linux using build tree
+$ export TONIC_PYTHON_PATH=/.../ParaView/build/lib/site-packages
+
+# Optionally you can set the TONIC_PYTHON_EXEC one.
+# If not provided __tonic-run-py__ will search for vtkpython or pvpython using
+# the TONIC_PYTHON_PATH one.
+$ export TONIC_PYTHON_PATH=/.../ParaView/build/bin/pvpython
 ```
 
-For example on Mac for an installed version of ParaView, you can run the following
-command line:
+Then you can install and run __tonic-data-generator__ with the following set
+of commands.
 
 ```sh
-$ tonic-install-py /Applications/paraview.app/Contents/Python
+# Install globally
+$ npm install -g tonic-data-generator
+
+# Update your python path with latest tonic code base
+$ tonic-install-py
+
+# Run a data generator script (TONIC_PYTHON_PATH must be set)
+$ tonic-run-py /path/to/your/python/script.py
 ```
 
 ## Usage

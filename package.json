@@ -1,20 +1,34 @@
 {
   "name": "tonic-data-generator",
   "description": "External tool for data generation",
-  "version": "0.0.5",
+  "version": "0.0.0-semantically-release",
   "license": "BSD-3-Clause",
   "repository": {
     "type": "git",
     "url": "https://github.com/Kitware/tonic-data-generator.git"
   },
   "dependencies": {
-    "wrench": "1.5.8"
+    "wrench": "1.5.8",
+    "shelljs": "0.5.3"
   },
   "devDependencies": {
+    "cz-conventional-changelog": "1.1.0"
   },
   "scripts": {
+    "commit": "git-cz",
+    "semantic-release": "semantic-release pre && npm publish && semantic-release post",
+
+    "dep:release": "npm install commitizen@1.0.4 semantic-release@4.3.5",
+
+    "dep:travis" : "npm run dep:release",
+    "dep:local"  : "npm run dep:release",
+    "dep:global" : "npm run dep:release -- -g"
   },
   "bin": {
-    "tonic-install-py": "./bin/tonic-install-py-cli.js"
+    "tonic-install-py": "./bin/tonic-install-py-cli.js",
+    "tonic-run-py": "./bin/tonic-run-py-cli.js"
+  },
+  "czConfig": {
+    "path": "node_modules/cz-conventional-changelog"
   }
 }
