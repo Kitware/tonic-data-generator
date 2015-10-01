@@ -45,6 +45,9 @@ def vectProduct(axisA, axisB):
     normalVect = normalize(normalVect)
     return normalVect
 
+def dotProduct(vecA, vecB):
+    return (vecA[0] * vecB[0]) + (vecA[1] * vecB[1]) + (vecA[2] * vecB[2])
+
 def rotate(axis, angle, center, point):
     angleInRad = 3.141592654 * angle / 180.0
     rotation = axisangle_to_q(axis, angleInRad)

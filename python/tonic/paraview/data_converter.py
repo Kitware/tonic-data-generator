@@ -17,6 +17,8 @@ def getScalarFromRGB(rgb, scalarRange=[-1.0, 1.0]):
         # No value
         return float('NaN')
 
+
+
 # -----------------------------------------------------------------------------
 # Composite.json To order.array
 # -----------------------------------------------------------------------------
@@ -145,18 +147,15 @@ class ConvertCompositeSpriteToSortedStack(object):
 
             # Get Camera orientation and rotation information
             camDir = [0,0,0]
+            worldUp = [0,0,0]
             with open(os.path.join(directory, "camera.json"), "r") as f:
                 camera = json.load(f)
-                norm = 0
-                for i in range(3):
-                    camDir[i] = camera['position'][i] - camera['focalPoint'][i]
-                    norm += camDir[i] * camDir[i]
-                norm = math.sqrt(norm)
-                camDir = [ i / norm for i in camDir ]
-            rotAxis = [ camDir[1], -camDir[0], 0 ]
-            angle = math.acos(camDir[2])
-            # print "Camera orientation", camDir
-            # print "Rotation along", rotAxis, angle
+                camDir = normalize([ camera['position'][i] - camera['focalPoint'][i] for i in range(3) ])
+                worldUp = normalize(camera['viewUp'])
+
+            # [ camRight, camUp, camDir ] will be our new orthonormal basis for normals
+            camRight = vectProduct(camDir, worldUp)
+            camUp = vectProduct(camRight, camDir)
 
             # Tmp structure to capture (x,y,z) normal
             normalByLayer = vtkFloatArray()
@@ -180,8 +179,9 @@ class ConvertCompositeSpriteToSortedStack(object):
                     # Re-orient normal to be view based
                     vect = normalByLayer.GetTuple3(layerIdx * imageSize + idx)
                     if not math.isnan(vect[0]):
-                        rotation = axisangle_to_q(rotAxis, angle)
-                        rVect = qv_mult(rotation, vect)
+                        # Express normal in new basis we computed above
+                        rVect = normalize([ -dotProduct(vect, camRight), dotProduct(vect, camUp), dotProduct(vect, camDir)  ])
+
                         # Need to reverse vector ?
                         if rVect[2] < 0:
                             normalByLayer.SetTuple3(layerIdx * imageSize + idx, -rVect[0], -rVect[1], -rVect[2])
