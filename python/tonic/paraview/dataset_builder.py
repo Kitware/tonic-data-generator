@@ -440,7 +440,8 @@ class CompositeDataSetBuilder(DataSetBuilder):
             'dimensions': self.config['size'],
             'pipeline': self.config['scene'],
             'ranges': dataRanges,
-            'layers': len(self.config['scene'])
+            'layers': len(self.config['scene']),
+            'light': self.config['light']
         }
         self.dataHandler.addSection('SortedComposite', sortedCompositeSection)
         self.dataHandler.addSection('CompositePipeline', compositePipeline)
