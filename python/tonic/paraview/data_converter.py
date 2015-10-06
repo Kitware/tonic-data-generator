@@ -200,7 +200,11 @@ class ConvertCompositeSpriteToSortedStack(object):
                     offset = layerIdx * imageSize
                     imageIdx = idx % imageSize
                     vect = normalByLayer.GetTuple3(imageIdx + offset)
-                    sortedNormal.SetTuple3(idx, int(127.5 * (vect[0] + 1)), int(127.5 * (vect[1] + 1)), int(255 * vect[2]))
+                    if not math.isnan(vect[0]) and not math.isnan(vect[1]) and not math.isnan(vect[2]):
+                        sortedNormal.SetTuple3(idx, int(127.5 * (vect[0] + 1)), int(127.5 * (vect[1] + 1)), int(255 * vect[2]))
+                    else:
+                        print 'WARNING: encountered NaN in normal of layer ',layerIdx,': [',vect[0],',',vect[1],',',vect[2],']'
+                        sortedNormal.SetTuple3(idx, 128, 128, 255)
 
             # Write the sorted data
             with open(os.path.join(directory, 'normal.uint8'), 'wb') as f:
