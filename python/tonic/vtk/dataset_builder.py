@@ -81,8 +81,8 @@ class DataSetBuilder(object):
 # -----------------------------------------------------------------------------
 
 class ImageDataSetBuilder(DataSetBuilder):
-    def __init__(self, location, imageMimeType, cameraInfo, metadata={}):
-        DataSetBuilder.__init__(self, location, cameraInfo, metadata)
+    def __init__(self, location, imageMimeType, cameraInfo, metadata={}, sections={}):
+        DataSetBuilder.__init__(self, location, cameraInfo, metadata, sections)
         imageExtenstion = '.' + imageMimeType.split('/')[1]
         self.dataHandler.registerData(name='image', type='blob', mimeType=imageMimeType, fileName=imageExtenstion)
         self.imageCapture.SetFormat(imageMimeType)
@@ -100,8 +100,8 @@ class ImageDataSetBuilder(DataSetBuilder):
 # Volume Composite Dataset Builder
 # -----------------------------------------------------------------------------
 class VolumeCompositeDataSetBuilder(DataSetBuilder):
-    def __init__(self, location, imageMimeType, cameraInfo, metadata={}):
-        DataSetBuilder.__init__(self, location, cameraInfo, metadata)
+    def __init__(self, location, imageMimeType, cameraInfo, metadata={}, sections={}):
+        DataSetBuilder.__init__(self, location, cameraInfo, metadata, sections)
 
         self.dataHandler.addTypes('volume-composite', 'rgba+depth')
 
@@ -409,8 +409,8 @@ class ConvertVolumeStackToSortedStack(object):
 
 
 class SortedCompositeDataSetBuilder(VolumeCompositeDataSetBuilder):
-    def __init__(self, location, cameraInfo, metadata={}):
-        VolumeCompositeDataSetBuilder.__init__(self, location, 'image/png', cameraInfo, metadata)
+    def __init__(self, location, cameraInfo, metadata={}, sections={}):
+        VolumeCompositeDataSetBuilder.__init__(self, location, 'image/png', cameraInfo, metadata, sections)
         self.dataHandler.addTypes('sorted-composite', 'rgba')
 
         # Register order and color textures

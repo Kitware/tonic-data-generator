@@ -15,42 +15,48 @@ from tonic.vtk.dataset_builder import *
 # User configuration
 # -----------------------------------------------------------------------------
 
-dataset_destination_path = '/Users/seb/Desktop/vm_head_frozenct_steps_%s_%s_%s'
+dataset_destination_path = '/Users/seb/Desktop/head_ct_4_features'
 file_path = '/Users/seb/Downloads/vm_head_frozenct.mha'
 
 field = 'MetaImage'
 fieldRange = [0.0, 4095.0]
-nbSteps = 13
+features = [
+    (100, 800),   # Fluid  450   => 0.10
+    (900, 1250),  # Skin  1075   => 0.26
+    (1400, 2525), # Skull 1962.5 => 0.47
+    (2525, 4000)  # Teeth 3262.5 => 0.79
+]
+
+sections = {
+    'LookupTables': {
+        "VolumeScalar": {
+            "controlpoints": [
+                {"x": 0.00, "r":  0.5, "g":  0.5, "b":  0.5}, # Fluid
+                {"x": 0.11, "r":  0.5, "g":  0.5, "b":  0.5}, # Fluid
+                {"x": 0.12, "r":  1.0, "g":  0.8, "b":  0.4}, # Skin
+                {"x": 0.27, "r":  1.0, "g":  0.8, "b":  0.4}, # Skin
+                {"x": 0.28, "r":  1.0, "g":  1.0, "b":  1.0}, # Skull
+                {"x": 0.48, "r":  1.0, "g":  1.0, "b":  1.0}, # Skull
+                {"x": 0.49, "r":  1.0, "g":  0.8, "b":  0.6}, # Teeth
+                {"x": 1.00, "r":  1.0, "g":  0.8, "b":  0.6}  # Teeth
+            ],
+            "discrete" : True
+        }
+    }
+}
 
 # -----------------------------------------------------------------------------
 # VTK Helper methods
 # -----------------------------------------------------------------------------
 
-def updatePieceWise(pwf, dataRange, center, halfSpread):
-    scalarOpacity.RemoveAllPoints()
-    if (center - halfSpread) <= dataRange[0]:
-        scalarOpacity.AddPoint(dataRange[0], 0.0)
-        scalarOpacity.AddPoint(center, 1.0)
-    else:
-        scalarOpacity.AddPoint(dataRange[0], 0.0)
-        scalarOpacity.AddPoint(center - halfSpread, 0.0)
-        scalarOpacity.AddPoint(center, 1.0)
-
-    if (center + halfSpread) >= dataRange[1]:
-        scalarOpacity.AddPoint(dataRange[1], 0.0)
-    else:
-        scalarOpacity.AddPoint(center + halfSpread, 0.0)
-        scalarOpacity.AddPoint(dataRange[1], 0.0)
-
-
-def updatePieceWiseAsStep(pwf, dataRange, start, step):
+def updatePieceWiseAsStep(pwf, dataRange, start, end):
     scalarOpacity.RemoveAllPoints()
 
     scalarOpacity.AddPoint(dataRange[0], 0.0)
     scalarOpacity.AddPoint(start-1, 0.0)
     scalarOpacity.AddPoint(start, 1.0)
-    scalarOpacity.AddPoint(start+step, 1.0)
-    scalarOpacity.AddPoint(start+step+1, 0.0)
+    scalarOpacity.AddPoint(end, 1.0)
+    scalarOpacity.AddPoint(end+1, 0.0)
     scalarOpacity.AddPoint(dataRange[1], 0.0)
 
 # -----------------------------------------------------------------------------
@@ -67,9 +73,6 @@ mapper.RenderToImageOn()
 colorFunction = vtkColorTransferFunction()
 colorFunction.AddRGBPoint(fieldRange[0], 1.0, 1.0, 1.0)
 colorFunction.AddRGBPoint(fieldRange[1], 1.0, 1.0, 1.0)
-
-step = 250
-starts = [ 790 + step*i for i in range(nbSteps)]
 
 scalarOpacity = vtkPiecewiseFunction()
 
@@ -106,16 +109,16 @@ update_camera(renderer, camera)
 # -----------------------------------------------------------------------------
 
 # Create Image Builder
-vcdsb = SortedCompositeDataSetBuilder(dataset_destination_path % (nbSteps, step, window.GetSize()[0]), {'type': 'spherical', 'phi': range(0, 360, 30), 'theta': range(-60, 61, 30)})
+vcdsb = SortedCompositeDataSetBuilder(dataset_destination_path, {'type': 'spherical', 'phi': range(0, 360, 30), 'theta': range(-60, 61, 30)}, sections=sections)
 
 idx = 0
 vcdsb.start(window, renderer)
-for start in starts:
+for feature in features:
     idx += 1
-    updatePieceWiseAsStep(scalarOpacity, fieldRange, start, step)
+    updatePieceWiseAsStep(scalarOpacity, fieldRange, feature[0], feature[1])
 
     # Capture layer
-    vcdsb.activateLayer(field, start)
+    vcdsb.activateLayer(field, (feature[0] + feature[1])/2)
 
     # Write data
     vcdsb.writeData(mapper)
