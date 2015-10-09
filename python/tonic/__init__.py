@@ -161,6 +161,6 @@ class DataHandler(object):
         for key, value in self.data.iteritems():
             jsonData['data'].append(value)
 
-        filePathToWrite = os.path.join(self.__root, "info.json")
+        filePathToWrite = os.path.join(self.__root, "index.json")
         with open(filePathToWrite, "w") as fileToWrite:
             fileToWrite.write(json.dumps(jsonData))

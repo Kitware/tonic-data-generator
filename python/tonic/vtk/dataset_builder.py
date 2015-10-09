@@ -467,7 +467,7 @@ class SortedCompositeDataSetBuilder(VolumeCompositeDataSetBuilder):
             metadata['type'] = [ "tonic-query-data-model", "sorted-composite", "alpha" ]
 
             # Override info.json
-            with open(os.path.join(self.dataHandler.getBasePath(), "info.json"), 'w') as newMetaFile:
+            with open(os.path.join(self.dataHandler.getBasePath(), "index.json"), 'w') as newMetaFile:
                 newMetaFile.write(json.dumps(metadata))
 
         # Clean temporary data
