@@ -363,7 +363,7 @@ class CompositeDataSetBuilder(DataSetBuilder):
 
         # Remove tmp files
         os.remove(os.path.join(self.dataHandler.getBasePath(), "offset.json"))
-        os.remove(os.path.join(self.dataHandler.getBasePath(), "info.json"))
+        os.remove(os.path.join(self.dataHandler.getBasePath(), "index.json"))
         os.remove(os.path.join(self.dataHandler.getBasePath(), "config.json"))
 
         # Composite pipeline meta description

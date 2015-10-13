@@ -2,7 +2,7 @@
 # User configuration
 # -----------------------------------------------------------------------------
 
-outputDir = '/Users/seb/Desktop/diskout_composite/'
+outputDir = '/Users/seb/Desktop/diskout-composite-with-normal/'
 inputFile = '/Users/seb/Downloads/ParaViewData-3.98.1/Data/disk_out_ref.ex2'
 
 phi   = range(0, 360, 30)
@@ -28,6 +28,8 @@ reader.PointVariables = ['Temp', 'V', 'Pres', 'AsH3', 'GaMe3', 'CH4', 'H2']
 
 clip = simple.Clip(Input=reader)
 clip.ClipType.Normal = [0.0, 1.0, 0.0]
+clipSurface = simple.ExtractSurface(Input=clip)
+clipWithNormals = simple.GenerateSurfaceNormals(Input=clipSurface)
 
 streamLines = simple.StreamTracer(
     Input = reader,
@@ -36,10 +38,13 @@ streamLines = simple.StreamTracer(
     MaximumStreamlineLength = 20.16)
 streamLines.SeedType.Point2 = [5.75, 5.75, 10.15999984741211]
 streamLines.SeedType.Point1 = [-5.75, -5.75, -10.0]
+streamTubes = simple.Tube(Input=streamLines, Radius = 0.2)
+streamSurface = simple.ExtractSurface(Input=streamTubes)
+streamWithNormals = simple.GenerateSurfaceNormals(Input=streamSurface)
 
 sceneDescription = {
     'size': [500, 500],
-    'light': [ 'intensity' ], # 'normal'
+    'light': [ 'intensity', 'normal' ], # 'normal'
     'camera': {
         'CameraViewUp': [0.0, 0.0, 1.0],
         'CameraPosition': [0.0, -58.47, 0.07],
@@ -48,14 +53,14 @@ sceneDescription = {
     'scene': [
         {
             'name': 'Stream lines',
-            'source': simple.Tube(Input=streamLines, Radius = 0.2),
+            'source': streamWithNormals,
             'colors': {
                 'Pres': {'location': 'POINT_DATA', 'range': Pres_range },
                 'Temp': {'location': 'POINT_DATA', 'range': Temp_range }
             }
         },{
             'name': 'Clip',
-            'source': clip,
+            'source': clipWithNormals,
             'colors': {
                 'Pres': {'location': 'POINT_DATA', 'range': Pres_range },
                 'Temp': {'location': 'POINT_DATA', 'range': Temp_range }

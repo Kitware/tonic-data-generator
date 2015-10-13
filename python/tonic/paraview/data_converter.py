@@ -98,7 +98,7 @@ class ConvertCompositeSpriteToSortedStack(object):
             while len(self.layers) < self.nbLayers:
                 self.layers.append({})
 
-        with open(os.path.join(directory, "info.json"), "r") as f:
+        with open(os.path.join(directory, "index.json"), "r") as f:
             self.info = json.load(f)
 
         with open(os.path.join(directory, "offset.json"), "r") as f:
