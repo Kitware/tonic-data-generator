@@ -5,14 +5,18 @@ require('shelljs/global');
 var fs = require('fs'),
     path = require('path'),
     python = process.env.TONIC_PYTHON_EXEC,
-    execNames = ['pvpython', 'vtkpython', 'python'];
+    execNames = ['pvpython', 'vtkpython', 'python'],
+    runNotDone = true;
 
 function run() {
-    var cmd = [ python ];
-    for (var i = 2; i < process.argv.length; i++) {
-        cmd.push(process.argv[i]);
+    if(runNotDone) {
+        runNotDone= false;
+        var cmd = [ python ];
+        for (var i = 2; i < process.argv.length; i++) {
+            cmd.push(process.argv[i]);
+        }
+        exec(cmd.join(' '));
     }
-    exec(cmd.join(' '));
 }
 
 if(python) {

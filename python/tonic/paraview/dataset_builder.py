@@ -221,7 +221,11 @@ class LayerDataSetBuilder(DataSetBuilder):
     def getView(self):
         return self.view
 
-    def setActiveLayer(self, layer, field, hasMesh=False):
+    def setActiveLayer(self, layer, field, hasMesh=False, activeSource=None):
+        if activeSource:
+            self.activeSource = activeSource
+        else:
+            self.activeSource = self.input
         needDataRegistration = False
         if layer not in self.layerMap:
             layerObj = { 'name': layer, 'array': field, 'arrays': [ field ], 'active': True, 'type': 'Float32Array', 'hasMesh': hasMesh }
@@ -251,7 +255,7 @@ class LayerDataSetBuilder(DataSetBuilder):
 
     def writeLayerData(self, time=0):
         dataRange = [0, 1]
-        self.input.UpdatePipeline(time)
+        self.activeSource.UpdatePipeline(time)
 
         if self.activeField and self.activeLayer:
 
@@ -263,7 +267,7 @@ class LayerDataSetBuilder(DataSetBuilder):
                     self.view.CameraFocalPoint = camPos['focalPoint']
                     self.view.CameraPosition = camPos['position']
                     self.view.CameraViewUp = camPos['viewUp']
-                    self.dataRenderer.writeLightArray(self.dataHandler.getDataAbsoluteFilePath('%s__light'%self.activeLayer), self.input)
+                    self.dataRenderer.writeLightArray(self.dataHandler.getDataAbsoluteFilePath('%s__light'%self.activeLayer), self.activeSource)
 
                 # Capture mesh information
                 if self.layerMap[self.activeLayer]['hasMesh']:
@@ -271,7 +275,7 @@ class LayerDataSetBuilder(DataSetBuilder):
                         self.view.CameraFocalPoint = camPos['focalPoint']
                         self.view.CameraPosition = camPos['position']
                         self.view.CameraViewUp = camPos['viewUp']
-                        self.dataRenderer.writeMeshArray(self.dataHandler.getDataAbsoluteFilePath('%s__mesh'%self.activeLayer), self.input)
+                        self.dataRenderer.writeMeshArray(self.dataHandler.getDataAbsoluteFilePath('%s__mesh'%self.activeLayer), self.activeSource)
 
 
             for camPos in self.getCamera():
@@ -279,7 +283,7 @@ class LayerDataSetBuilder(DataSetBuilder):
                 self.view.CameraPosition = camPos['position']
                 self.view.CameraViewUp = camPos['viewUp']
                 dataName = ('%s_%s' % (self.activeLayer, self.activeField))
-                dataRange = self.dataRenderer.writeArray(self.dataHandler.getDataAbsoluteFilePath(dataName), self.input, self.activeField)
+                dataRange = self.dataRenderer.writeArray(self.dataHandler.getDataAbsoluteFilePath(dataName), self.activeSource, self.activeField)
 
             if self.activeField not in self.floatImage['ranges']:
                 self.floatImage['ranges'][self.activeField] = [ dataRange[0], dataRange[1] ]
