@@ -109,7 +109,9 @@ update_camera(renderer, camera)
 # -----------------------------------------------------------------------------
 
 # Create Image Builder
-vcdsb = SortedCompositeDataSetBuilder(dataset_destination_path, {'type': 'spherical', 'phi': range(0, 360, 30), 'theta': range(-60, 61, 30)}, sections=sections)
+phi = range(0, 360, 30)
+theta = range(-60, 61, 30)
+vcdsb = SortedCompositeDataSetBuilder(dataset_destination_path, {'type': 'spherical', 'phi': phi, 'theta': theta}, sections=sections)
 
 idx = 0
 vcdsb.start(window, renderer)

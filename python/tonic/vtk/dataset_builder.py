@@ -445,11 +445,11 @@ class SortedCompositeDataSetBuilder(VolumeCompositeDataSetBuilder):
                 print 'Process', os.path.join(root, name)
                 self.dataConverter.convert(os.path.join(root, name))
 
-        # Rename info.json to info_origin.json
-        os.rename(os.path.join(self.dataHandler.getBasePath(), "info.json"), os.path.join(self.dataHandler.getBasePath(), "info_origin.json"))
+        # Rename index.json to info_origin.json
+        os.rename(os.path.join(self.dataHandler.getBasePath(), "index.json"), os.path.join(self.dataHandler.getBasePath(), "index_origin.json"))
 
-        # Update info.json
-        with open(os.path.join(self.dataHandler.getBasePath(), "info_origin.json"), "r") as infoFile:
+        # Update index.json
+        with open(os.path.join(self.dataHandler.getBasePath(), "index_origin.json"), "r") as infoFile:
             metadata = json.load(infoFile)
             metadata['SortedComposite'] = {
                 'dimensions': metadata['CompositePipeline']['dimensions'],
@@ -466,7 +466,7 @@ class SortedCompositeDataSetBuilder(VolumeCompositeDataSetBuilder):
             metadata['data'] = dataToKeep
             metadata['type'] = [ "tonic-query-data-model", "sorted-composite", "alpha" ]
 
-            # Override info.json
+            # Override index.json
             with open(os.path.join(self.dataHandler.getBasePath(), "index.json"), 'w') as newMetaFile:
                 newMetaFile.write(json.dumps(metadata))
 
@@ -475,7 +475,7 @@ class SortedCompositeDataSetBuilder(VolumeCompositeDataSetBuilder):
             for root, dirs, files in os.walk(self.dataHandler.getBasePath()):
                 print 'Clean', root
                 for name in files:
-                    if '_rgb.png' in name or '_depth.uint8' in name or name == "info_origin.json":
+                    if '_rgb.png' in name or '_depth.uint8' in name or name == "index_origin.json":
                         os.remove(os.path.join(root, name))
 
         if compress:
