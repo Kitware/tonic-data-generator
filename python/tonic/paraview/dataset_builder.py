@@ -6,8 +6,9 @@ from tonic.paraview import data_writer
 from tonic.paraview import data_converter
 
 from paraview import simple
+from vtk import *
 
-import json, os, math, gzip, shutil
+import json, os, math, gzip, shutil, hashlib
 
 # Global helper variables
 encode_codes = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ'
@@ -56,10 +57,11 @@ class DataSetBuilder(object):
             self.view = view
 
             # Handle camera if any
-            if self.cameraDescription['type'] == 'spherical':
-                self.camera = SphericalCamera(self.dataHandler, view.CenterOfRotation, view.CameraPosition, view.CameraViewUp, self.cameraDescription['phi'], self.cameraDescription['theta'])
-            elif self.cameraDescription['type'] == 'cylindrical':
-                self.camera = CylindricalCamera(self.dataHandler, view.CenterOfRotation, view.CameraPosition, view.CameraViewUp, self.cameraDescription['phi'], self.cameraDescription['translation'])
+            if self.cameraDescription:
+                if self.cameraDescription['type'] == 'spherical':
+                    self.camera = SphericalCamera(self.dataHandler, view.CenterOfRotation, view.CameraPosition, view.CameraViewUp, self.cameraDescription['phi'], self.cameraDescription['theta'])
+                elif self.cameraDescription['type'] == 'cylindrical':
+                    self.camera = CylindricalCamera(self.dataHandler, view.CenterOfRotation, view.CameraPosition, view.CameraViewUp, self.cameraDescription['phi'], self.cameraDescription['translation'])
 
             # Update background color
             bgColor = view.Background
@@ -589,3 +591,128 @@ class CompositeDataSetBuilder(DataSetBuilder):
             self.view.WriteImage()
             self.view.ComputeZOrdering()
             self.view.WriteComposite()
+
+
+# -----------------------------------------------------------------------------
+# GeometryDataSetBuilder Dataset Builder
+# -----------------------------------------------------------------------------
+
+class GeometryDataSetBuilder(DataSetBuilder):
+    def __init__(self, location, sceneConfig, metadata={}, sections={}):
+        DataSetBuilder.__init__(self, location, None, metadata, sections)
+
+        # Create a representation for all scene sources
+        self.config = sceneConfig
+
+        # Processing pipeline
+        self.surfaceExtract = None
+
+        # Add directory path
+        self.dataHandler.registerData(name='scene', fileName='scene.json')
+
+        # Create directory containers
+        pointsPath = os.path.join(location, 'points')
+        polyPath = os.path.join(location, 'index')
+        colorPath = os.path.join(location, 'fields')
+        for p in [pointsPath, polyPath, colorPath]:
+            if not os.path.exists(p):
+                os.makedirs(p)
+
+
+    def writeData(self, time=0):
+        currentScene = [];
+        for data in self.config['scene']:
+            currentData = {
+                'name': data['name'],
+                'fields': {}
+            }
+            currentScene.append(currentData)
+            if self.surfaceExtract:
+                self.merge.Input = data['source']
+            else:
+                self.merge = simple.MergeBlocks(Input=data['source'], MergePoints=0)
+                self.surfaceExtract = simple.ExtractSurface(Input=self.merge)
+
+
+            # Extract surface
+            self.surfaceExtract.UpdatePipeline(time)
+            ds = self.surfaceExtract.SMProxy.GetClientSideObject().GetOutputDataObject(0)
+
+            originalPoints = ds.GetPoints()
+
+            # Points
+            points = vtkFloatArray()
+            nbPoints = originalPoints.GetNumberOfPoints()
+            points.SetNumberOfComponents(3)
+            points.SetNumberOfTuples(nbPoints)
+            for idx in range(nbPoints):
+                coord = originalPoints.GetPoint(idx)
+                points.SetTuple3(idx, coord[0], coord[1], coord[2])
+
+            pBuffer = buffer(points)
+            pMd5 = hashlib.md5(pBuffer).hexdigest()
+            pPath = os.path.join(self.dataHandler.getBasePath(), 'points',"%s.float32" % pMd5)
+            currentData['points'] = 'points/%s.float32' % pMd5
+            with open(pPath, 'wb') as f:
+                f.write(pBuffer)
+
+            # Polys
+            poly = ds.GetPolys()
+            nbCells = poly.GetNumberOfCells()
+            cellLocation = 0
+            nbPoints = 0
+            idList = vtkIdList()
+            topo = vtkTypeUInt32Array()
+            topo.Allocate(poly.GetData().GetNumberOfTuples())
+
+            for cellIdx in range(nbCells):
+                poly.GetCell(cellLocation, idList)
+                cellSize = idList.GetNumberOfIds()
+                cellLocation += cellSize + 1
+                firstIdx = idList.GetId(0)
+                for i in range(cellSize):
+                    if i % 3 == 0 and i > 0:
+                        topo.InsertNextValue(idList.GetId(i))
+                        topo.InsertNextValue(firstIdx)
+                        topo.InsertNextValue(idList.GetId(i))
+                    else:
+                        topo.InsertNextValue(idList.GetId(i))
+
+            iBuffer = buffer(topo)
+            iMd5 = hashlib.md5(iBuffer).hexdigest()
+            iPath = os.path.join(self.dataHandler.getBasePath(), 'index',"%s.uint32" % iMd5)
+            currentData['index'] = 'index/%s.uint32' % iMd5
+            with open(iPath, 'wb') as f:
+                f.write(iBuffer)
+
+            # Colors / FIXME
+            for fieldName, fieldInfo in data['colors'].iteritems():
+                array = ds.GetPointData().GetArray(fieldName)
+                tupleSize = array.GetNumberOfComponents()
+                arraySize = array.GetNumberOfTuples()
+                outputField = vtkFloatArray()
+                outputField.SetNumberOfTuples(arraySize)
+                if tupleSize == 1:
+                    for i in range(arraySize):
+                        outputField.SetValue(i, array.GetValue(i))
+                else:
+                    # compute magnitude
+                    # FIXME
+                    for i in range(arraySize):
+                        outputField.SetValue(i, array.GetValue(i))
+
+                fBuffer = buffer(outputField)
+                fMd5 = hashlib.md5(fBuffer).hexdigest()
+                fPath = os.path.join(self.dataHandler.getBasePath(), 'fields',"%s_%s.float32" % (fieldName, fMd5))
+                with open(fPath, 'wb') as f:
+                    f.write(fBuffer)
+
+                currentData['fields'][fieldName] = 'fields/%s_%s.float32' % (fieldName, fMd5)
+
+        # Write scene
+        with open(self.dataHandler.getDataAbsoluteFilePath('scene'), 'w') as f:
+            f.write(json.dumps(currentScene, indent=4))
+
+
+    def stop(self, compress=True, clean=True):
+        DataSetBuilder.stop(self)
