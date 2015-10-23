@@ -672,14 +672,19 @@ class GeometryDataSetBuilder(DataSetBuilder):
                 poly.GetCell(cellLocation, idList)
                 cellSize = idList.GetNumberOfIds()
                 cellLocation += cellSize + 1
-                firstIdx = idList.GetId(0)
-                for i in range(cellSize):
-                    if i % 3 == 0 and i > 0:
-                        topo.InsertNextValue(idList.GetId(i))
-                        topo.InsertNextValue(firstIdx)
-                        topo.InsertNextValue(idList.GetId(i))
-                    else:
-                        topo.InsertNextValue(idList.GetId(i))
+                if cellSize == 3:
+                    topo.InsertNextValue(idList.GetId(0))
+                    topo.InsertNextValue(idList.GetId(1))
+                    topo.InsertNextValue(idList.GetId(2))
+                elif cellSize == 4:
+                    topo.InsertNextValue(idList.GetId(0))
+                    topo.InsertNextValue(idList.GetId(1))
+                    topo.InsertNextValue(idList.GetId(3))
+                    topo.InsertNextValue(idList.GetId(1))
+                    topo.InsertNextValue(idList.GetId(2))
+                    topo.InsertNextValue(idList.GetId(3))
+                else:
+                    print "Cell size of", cellSize, "not supported"
 
             iBuffer = buffer(topo)
             iMd5 = hashlib.md5(iBuffer).hexdigest()
