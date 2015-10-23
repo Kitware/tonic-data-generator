@@ -114,7 +114,7 @@ class DataProberDataSetBuilder(DataSetBuilder):
         self.dataHandler.addTypes('data-prober', 'binary')
         self.DataProber = { 'types': {}, 'dimensions': sampling_dimesions, 'ranges': {}, 'spacing': [1,1,1] }
         for field in self.fieldsToWrite:
-            self.dataHandler.registerData(name=field, type='array', fileName='/%s.array' % field)
+            self.dataHandler.registerData(name=field, type='array', rootFile=True, fileName='%s.array' % field)
 
     def writeData(self, time=0):
         self.resamplerFilter.UpdatePipeline(time)
@@ -236,11 +236,11 @@ class LayerDataSetBuilder(DataSetBuilder):
             needDataRegistration = True
 
             # Register layer lighting
-            self.dataHandler.registerData(name='%s__light' % layer, type='array', fileName='/%s__light.array' % layer, categories=[ '%s__light' % layer ])
+            self.dataHandler.registerData(name='%s__light' % layer, type='array', rootFile=True, fileName='%s__light.array' % layer, categories=[ '%s__light' % layer ])
 
             # Register layer mesh
             if hasMesh:
-                self.dataHandler.registerData(name='%s__mesh' % layer, type='array', fileName='/%s__mesh.array' % layer, categories=[ '%s__mesh' % layer ])
+                self.dataHandler.registerData(name='%s__mesh' % layer, type='array', rootFile=True, fileName='%s__mesh.array' % layer, categories=[ '%s__mesh' % layer ])
 
         elif field not in self.layerMap[layer]['arrays']:
             self.layerMap[layer]['arrays'].append(field)
@@ -253,7 +253,7 @@ class LayerDataSetBuilder(DataSetBuilder):
         self.activeField = field
 
         if needDataRegistration:
-            self.dataHandler.registerData(name='%s_%s' % (layer, field), type='array', fileName='/%s_%s.array' % (layer, field), categories=[ '%s_%s' % (layer, field) ])
+            self.dataHandler.registerData(name='%s_%s' % (layer, field), type='array', rootFile=True, fileName='%s_%s.array' % (layer, field), categories=[ '%s_%s' % (layer, field) ])
 
     def writeLayerData(self, time=0):
         dataRange = [0, 1]
@@ -344,7 +344,7 @@ class CompositeDataSetBuilder(DataSetBuilder):
             self.representations.append(rep)
 
         # Add directory path
-        self.dataHandler.registerData(name='directory', fileName='/file.txt', categories=['trash'])
+        self.dataHandler.registerData(name='directory', rootFile=True, fileName='file.txt', categories=['trash'])
         self.offsetMap = {}
 
     def start(self):
@@ -601,6 +601,9 @@ class GeometryDataSetBuilder(DataSetBuilder):
     def __init__(self, location, sceneConfig, metadata={}, sections={}):
         DataSetBuilder.__init__(self, location, None, metadata, sections)
 
+        # Update data type
+        self.dataHandler.addTypes('geometry');
+
         # Create a representation for all scene sources
         self.config = sceneConfig
 
@@ -608,7 +611,7 @@ class GeometryDataSetBuilder(DataSetBuilder):
         self.surfaceExtract = None
 
         # Add directory path
-        self.dataHandler.registerData(name='scene', fileName='scene.json')
+        self.dataHandler.registerData(priority=0, name='scene', rootFile=True, fileName='scene.json', type='json')
 
         # Create directory containers
         pointsPath = os.path.join(location, 'points')
@@ -651,8 +654,8 @@ class GeometryDataSetBuilder(DataSetBuilder):
 
             pBuffer = buffer(points)
             pMd5 = hashlib.md5(pBuffer).hexdigest()
-            pPath = os.path.join(self.dataHandler.getBasePath(), 'points',"%s.float32" % pMd5)
-            currentData['points'] = 'points/%s.float32' % pMd5
+            pPath = os.path.join(self.dataHandler.getBasePath(), 'points',"%s.Float32Array" % pMd5)
+            currentData['points'] = 'points/%s.Float32Array' % pMd5
             with open(pPath, 'wb') as f:
                 f.write(pBuffer)
 
@@ -680,8 +683,8 @@ class GeometryDataSetBuilder(DataSetBuilder):
 
             iBuffer = buffer(topo)
             iMd5 = hashlib.md5(iBuffer).hexdigest()
-            iPath = os.path.join(self.dataHandler.getBasePath(), 'index',"%s.uint32" % iMd5)
-            currentData['index'] = 'index/%s.uint32' % iMd5
+            iPath = os.path.join(self.dataHandler.getBasePath(), 'index',"%s.Uint32Array" % iMd5)
+            currentData['index'] = 'index/%s.Uint32Array' % iMd5
             with open(iPath, 'wb') as f:
                 f.write(iBuffer)
 
@@ -703,11 +706,11 @@ class GeometryDataSetBuilder(DataSetBuilder):
 
                 fBuffer = buffer(outputField)
                 fMd5 = hashlib.md5(fBuffer).hexdigest()
-                fPath = os.path.join(self.dataHandler.getBasePath(), 'fields',"%s_%s.float32" % (fieldName, fMd5))
+                fPath = os.path.join(self.dataHandler.getBasePath(), 'fields',"%s_%s.Float32Array" % (fieldName, fMd5))
                 with open(fPath, 'wb') as f:
                     f.write(fBuffer)
 
-                currentData['fields'][fieldName] = 'fields/%s_%s.float32' % (fieldName, fMd5)
+                currentData['fields'][fieldName] = 'fields/%s_%s.Float32Array' % (fieldName, fMd5)
 
         # Write scene
         with open(self.dataHandler.getDataAbsoluteFilePath('scene'), 'w') as f:

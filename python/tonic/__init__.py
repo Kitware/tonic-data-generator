@@ -84,7 +84,10 @@ class DataHandler(object):
         argName = kwargs['name']
         for key, value in kwargs.iteritems():
             if key == 'fileName':
-                newData['pattern'] = '{pattern}%s' % value
+                if 'rootFile' in kwargs and kwargs['rootFile']:
+                    newData['pattern'] = '{pattern}/%s' % value
+                else:
+                    newData['pattern'] = '{pattern}%s' % value
             else:
                 newData[key] = value
 
@@ -96,8 +99,12 @@ class DataHandler(object):
     def getDataAbsoluteFilePath(self, name, createDirectories=True):
         dataPattern = self.data[name]['pattern']
         if '{pattern}' in dataPattern:
-            dataPattern = dataPattern.replace('{pattern}', self.basePattern)
-            self.data[name]['pattern'] = dataPattern
+            if len(self.basePattern) == 0:
+                dataPattern = dataPattern.replace('{pattern}/', self.basePattern).replace('{pattern}', self.basePattern)
+                self.data[name]['pattern'] = dataPattern
+            else:
+                dataPattern = dataPattern.replace('{pattern}', self.basePattern)
+                self.data[name]['pattern'] = dataPattern
 
         keyValuePair = {}
         for key, value in self.current.iteritems():

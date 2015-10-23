@@ -5,15 +5,6 @@
 outputDir = '/Users/seb/Desktop/Geometry-diskout/'
 inputFile = '/Users/seb/Downloads/ParaViewData-3.98.1/Data/disk_out_ref.ex2'
 
-phi   = range(0, 360, 30)
-theta = range(-60, 61, 30)
-
-AsH3_range = [0.0804768, 0.184839]
-Temp_range = [293.15, 913.15]
-Pres_range = [0.00678552, 0.0288185]
-V_range    = [0.0, 1.0]
-Vorticity_range  = [0.0, 1.0]
-
 # -----------------------------------------------------------------------------
 
 from paraview import simple
