@@ -216,6 +216,7 @@ class LayerDataSetBuilder(DataSetBuilder):
         self.activeLayer = None
         self.activeField = None
         self.layerChanged = False
+        self.lastTime = -1
 
         # Update data type
         self.dataHandler.addTypes('float-image')
@@ -261,8 +262,9 @@ class LayerDataSetBuilder(DataSetBuilder):
 
         if self.activeField and self.activeLayer:
 
-            if self.layerChanged:
+            if self.layerChanged or self.lastTime != time:
                 self.layerChanged = False
+                self.lastTime = time
 
                 # Capture lighting information
                 for camPos in self.getCamera():
