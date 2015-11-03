@@ -419,7 +419,7 @@ class SortedCompositeDataSetBuilder(VolumeCompositeDataSetBuilder):
         self.dataConverter = ConvertVolumeStackToSortedStack(imageSize[0], imageSize[1])
 
     def activateLayer(self, colorBy, scalar):
-        VolumeCompositeDataSetBuilder.activateLayer(self, 'root', '%d' % scalar, colorBy)
+        VolumeCompositeDataSetBuilder.activateLayer(self, 'root', '%s' % scalar, colorBy)
         self.layerScalars.append(scalar)
 
     def writeData(self, mapper):
