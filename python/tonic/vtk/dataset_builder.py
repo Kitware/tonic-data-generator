@@ -126,52 +126,29 @@ class VolumeCompositeDataSetBuilder(DataSetBuilder):
         self.activeRGBKey = ''
         self.nodeWithChildren = {}
 
-    def activateLayer(self, parent, name, colorBy):
-        layerCode = ''
-        colorCode = ''
-        needToRegisterDepth = False
-        needToRegisterColor = False
-        if name in self.layerInfo:
-            # Layer already exist
-            layerCode = self.layerInfo[name]['code']
-            if colorBy not in self.compositePipeline['layer_fields'][name]:
-                if colorBy in self.colorByMapping:
-                    # Color already registered
-                    # => Add it for the field if not already in
-                    colorCode = self.colorByMapping[colorBy]
-                    if colorCode not in self.compositePipeline['layer_fields'][layerCode]:
-                        needToRegisterColor = True
-                        self.compositePipeline['layer_fields'][layerCode].append(colorCode)
-                else:
-                    needToRegisterColor = True
-                    # No color code assigned yet
-                    colorCode = encode_codes[len(self.colorByMapping)]
-                    # Assign color code
-                    self.colorByMapping[colorBy] = colorCode
-                    # Register color code with color by value
-                    self.compositePipeline['fields'][colorCode] = colorBy
-                    # Add color code to the layer
-                    self.compositePipeline['layer_fields'][layerCode].append(colorCode)
+    def _getColorCode(self, colorBy):
+        if colorBy in self.colorByMapping:
+            # The color code exist
+            return self.colorByMapping[colorBy]
         else:
-            # The layer does not exist yet
-            needToRegisterDepth = True
-            needToRegisterColor = True
+            # No color code assigned yet
+            colorCode = encode_codes[len(self.colorByMapping)]
+            # Assign color code
+            self.colorByMapping[colorBy] = colorCode
+            # Register color code with color by value
+            self.compositePipeline['fields'][colorCode] = colorBy
+            # Return the color code
+            return colorCode
+
+    def _getLayerCode(self, parent, layerName):
+        if layerName in self.layerInfo:
+            # Layer already exist
+            return (self.layerInfo[layerName]['code'], False)
+        else:
             layerCode = encode_codes[len(self.layerInfo)]
-            self.layerInfo[layerCode] = { 'code': layerCode, 'name': name, 'parent': parent }
+            self.layerInfo[layerName] = { 'code': layerCode, 'name': layerName, 'parent': parent }
             self.compositePipeline['layers'].append(layerCode)
-            if colorBy in self.colorByMapping:
-                # The color code exist
-                colorCode = self.colorByMapping[colorBy]
-                self.compositePipeline['layer_fields'][layerCode] = [ colorCode ]
-            else:
-                # No color code assigned yet
-                colorCode = encode_codes[len(self.colorByMapping)]
-                # Assign color code
-                self.colorByMapping[colorBy] = colorCode
-                # Register color code with color by value
-                self.compositePipeline['fields'][colorCode] = colorBy
-                # Add color code to the layer
-                self.compositePipeline['layer_fields'][layerCode] = [ colorCode ]
+            self.compositePipeline['layer_fields'][layerCode] = []
 
             # Let's register it in the pipeline
             if parent:
@@ -182,11 +159,25 @@ class VolumeCompositeDataSetBuilder(DataSetBuilder):
                     self.compositePipeline['pipeline'].append(rootNode)
 
                 # Add node to its parent
-                self.nodeWithChildren[parent]['children'].append({'name': name, 'ids': [layerCode]})
+                self.nodeWithChildren[parent]['children'].append({'name': layerName, 'ids': [layerCode]})
                 self.nodeWithChildren[parent]['ids'].append(layerCode)
 
             else:
-                self.compositePipeline['pipeline'].append({'name': name, 'ids': [layerCode]})
+                self.compositePipeline['pipeline'].append({'name': layerName, 'ids': [layerCode]})
+
+            return (layerCode, True)
+
+    def _needToRegisterColor(self, layerCode, colorCode):
+        if colorCode in self.compositePipeline['layer_fields'][layerCode]:
+            return False
+        else:
+            self.compositePipeline['layer_fields'][layerCode].append(colorCode)
+            return True
+
+    def activateLayer(self, parent, name, colorBy):
+        layerCode, needToRegisterDepth = self._getLayerCode(parent, name)
+        colorCode = self._getColorCode(colorBy)
+        needToRegisterColor = self._needToRegisterColor(layerCode, colorCode)
 
         # Update active keys
         self.activeDepthKey = '%s_depth' % layerCode
@@ -341,6 +332,9 @@ class ConvertVolumeStackToSortedStack(object):
                     depthPaths[fileId] = os.path.join(directory, fileName)
 
         layerNames.sort()
+
+        if len(layerNames) == 0:
+            return
 
         # Load data in Memory
         depthArrays = []
