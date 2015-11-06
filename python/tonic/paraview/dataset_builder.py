@@ -623,6 +623,74 @@ class GeometryDataSetBuilder(DataSetBuilder):
             if not os.path.exists(p):
                 os.makedirs(p)
 
+        # Create metadata structure
+        colorToCodeMap = {}
+        parentNodes = {}
+        pipelineMeta = {
+            'layers': [],
+            'pipeline': [],
+            'layer_fields': {},
+            'fields': {}
+        }
+        geometryMeta = {
+            'ranges': {},
+            'layer_map': {}
+        }
+        for item in sceneConfig['scene']:
+            # Handle layer
+            layerCode = encode_codes[len(pipelineMeta['layers'])]
+            pipelineMeta['layers'].append(layerCode)
+            geometryMeta['layer_map'][layerCode] = item['name']
+
+            # Handle colors
+            pipelineMeta['layer_fields'][layerCode] = []
+            for fieldName in item['colors']:
+                colorCode = None
+                if fieldName in colorToCodeMap:
+                    colorCode = colorToCodeMap[fieldName]
+                else:
+                    colorCode = encode_codes[len(colorToCodeMap)]
+                    colorToCodeMap[fieldName] = colorCode
+                    geometryMeta['ranges'][fieldName] = [0, 1] # FIXME we don't know the range
+
+                pipelineMeta['layer_fields'][layerCode].append(colorCode)
+                pipelineMeta['fields'][colorCode] = fieldName
+
+            # Handle pipeline
+            if 'parent' in item:
+                # Need to handle hierarchy
+                if item['parent'] in parentNodes:
+                    # Fill children
+                    rootNode = parentNodes[item['parent']]
+                    rootNode['ids'].append(layerCode)
+                    rootNode['children'].append({
+                        'name': item['name'],
+                        'ids': [layerCode]
+                    })
+                else:
+                    # Create root + register
+                    rootNode = {
+                        'name': item['parent'],
+                        'ids': [ layerCode ],
+                        'children': [
+                            {
+                                'name': item['name'],
+                                'ids': [ layerCode ]
+                            }
+                        ]
+                    }
+                    parentNodes[item['parent']] = rootNode
+                    pipelineMeta['pipeline'].append(rootNode)
+            else:
+                # Add item info as a new pipeline node
+                pipelineMeta['pipeline'].append({
+                    'name': item['name'],
+                    'ids': [layerCode]
+                })
+
+        # Register metadata to be written in index.json
+        self.dataHandler.addSection('Geometry', geometryMeta)
+        self.dataHandler.addSection('CompositePipeline', pipelineMeta)
 
     def writeData(self, time=0):
         currentScene = [];

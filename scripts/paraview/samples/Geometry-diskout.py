@@ -29,6 +29,32 @@ streamLines.SeedType.Point2 = [5.75, 5.75, 10.15999984741211]
 streamLines.SeedType.Point1 = [-5.75, -5.75, -10.0]
 streamTubes = simple.Tube(Input=streamLines, Radius = 0.2)
 
+sections = {
+    "LookupTables": {
+        "AsH3": {
+          "range": [
+            0.0804768,
+            0.184839
+          ],
+          "preset": "wildflower"
+        },
+        "Pres": {
+          "range": [
+            0.00678552,
+            0.0288185
+          ],
+          "preset": "cool"
+        },
+        "Temp": {
+          "range": [
+            293.15,
+            913.15
+          ],
+          "preset": "spectralflip"
+        }
+    }
+}
+
 sceneDescription = {
     'scene': [
         {
@@ -96,7 +122,7 @@ sceneDescription = {
 # -----------------------------------------------------------------------------
 
 # Create Image Builder
-dsb = GeometryDataSetBuilder(outputDir, sceneDescription)
+dsb = GeometryDataSetBuilder(outputDir, sceneDescription, sections=sections)
 
 dsb.start()
 dsb.writeData()
