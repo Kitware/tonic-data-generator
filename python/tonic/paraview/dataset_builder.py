@@ -775,9 +775,13 @@ class GeometryDataSetBuilder(DataSetBuilder):
                         outputField.SetValue(i, array.GetValue(i))
                 else:
                     # compute magnitude
-                    # FIXME
+                    tupleIdxs = range(tupleSize)
                     for i in range(arraySize):
-                        outputField.SetValue(i, array.GetValue(i))
+                        magnitude = 0
+                        for j in tupleIdxs:
+                            magnitude += math.pow(array.GetValue(i * tupleSize + j), 2)
+
+                        outputField.SetValue(i, math.sqrt(magnitude))
 
                 fBuffer = buffer(outputField)
                 fMd5 = hashlib.md5(fBuffer).hexdigest()
