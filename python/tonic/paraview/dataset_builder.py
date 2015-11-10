@@ -634,13 +634,16 @@ class GeometryDataSetBuilder(DataSetBuilder):
         }
         geometryMeta = {
             'ranges': {},
-            'layer_map': {}
+            'layer_map': {},
+            'object_size': {}
         }
+        self.objSize = geometryMeta['object_size']
         for item in sceneConfig['scene']:
             # Handle layer
             layerCode = encode_codes[len(pipelineMeta['layers'])]
             pipelineMeta['layers'].append(layerCode)
             geometryMeta['layer_map'][layerCode] = item['name']
+            geometryMeta['object_size'][item['name']] = { 'points': 0, 'index': 0 }
 
             # Handle colors
             pipelineMeta['layer_fields'][layerCode] = []
@@ -710,6 +713,7 @@ class GeometryDataSetBuilder(DataSetBuilder):
             # Extract surface
             self.surfaceExtract.UpdatePipeline(time)
             ds = self.surfaceExtract.SMProxy.GetClientSideObject().GetOutputDataObject(0)
+            originalDS = data['source'].SMProxy.GetClientSideObject().GetOutputDataObject(0)
 
             originalPoints = ds.GetPoints()
 
@@ -733,7 +737,6 @@ class GeometryDataSetBuilder(DataSetBuilder):
             poly = ds.GetPolys()
             nbCells = poly.GetNumberOfCells()
             cellLocation = 0
-            nbPoints = 0
             idList = vtkIdList()
             topo = vtkTypeUInt32Array()
             topo.Allocate(poly.GetData().GetNumberOfTuples())
@@ -762,6 +765,10 @@ class GeometryDataSetBuilder(DataSetBuilder):
             currentData['index'] = 'index/%s.Uint32Array' % iMd5
             with open(iPath, 'wb') as f:
                 f.write(iBuffer)
+
+            # Grow object side
+            self.objSize[data['name']]['points'] = max(self.objSize[data['name']]['points'], nbPoints)
+            self.objSize[data['name']]['index'] = max(self.objSize[data['name']]['index'], topo.GetNumberOfTuples())
 
             # Colors / FIXME
             for fieldName, fieldInfo in data['colors'].iteritems():
@@ -798,3 +805,13 @@ class GeometryDataSetBuilder(DataSetBuilder):
 
     def stop(self, compress=True, clean=True):
         DataSetBuilder.stop(self)
+
+        if compress:
+            for dirName in ['fields', 'index', 'points']:
+                for root, dirs, files in os.walk(os.path.join(self.dataHandler.getBasePath(), dirName)):
+                    print 'Compress', root
+                    for name in files:
+                        if 'Array' in name and '.gz' not in name:
+                            with open(os.path.join(root, name), 'rb') as f_in, gzip.open(os.path.join(root, name + '.gz'), 'wb') as f_out:
+                                shutil.copyfileobj(f_in, f_out)
+                            os.remove(os.path.join(root, name))
