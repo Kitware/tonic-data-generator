@@ -6,6 +6,7 @@ from tonic.paraview import data_writer
 from tonic.paraview import data_converter
 
 from paraview import simple
+from paraview import servermanager
 from vtk import *
 
 import json, os, math, gzip, shutil, hashlib
@@ -41,6 +42,9 @@ class DataSetBuilder(object):
 
         for key, value in sections.iteritems():
             self.dataHandler.addSection(key, value)
+
+        # Update the can_write flag for MPI
+        self.dataHandler.can_write = (servermanager.vtkProcessModule.GetProcessModule().GetPartitionId() == 0)
 
     def getDataHandler(self):
         return self.dataHandler
@@ -117,6 +121,9 @@ class DataProberDataSetBuilder(DataSetBuilder):
             self.dataHandler.registerData(name=field, type='array', rootFile=True, fileName='%s.array' % field)
 
     def writeData(self, time=0):
+        if not self.dataHandler.can_write:
+            return
+
         self.resamplerFilter.UpdatePipeline(time)
         imageData = self.resamplerFilter.GetClientSideObject().GetOutput()
         self.DataProber['spacing'] = imageData.GetSpacing()
@@ -302,6 +309,9 @@ class LayerDataSetBuilder(DataSetBuilder):
         DataSetBuilder.start(self, self.view)
 
     def stop(self, compress=True):
+        if not self.dataHandler.can_write:
+            return
+
         # Push metadata
         self.dataHandler.addSection('FloatImage', self.floatImage)
 
@@ -354,6 +364,9 @@ class CompositeDataSetBuilder(DataSetBuilder):
 
     def stop(self, compress=True, clean=True):
         DataSetBuilder.stop(self)
+
+        if not self.dataHandler.can_write:
+            return
 
         with open(os.path.join(self.dataHandler.getBasePath(), "offset.json"), 'w') as f:
             f.write(json.dumps(self.offsetMap))
@@ -513,8 +526,9 @@ class CompositeDataSetBuilder(DataSetBuilder):
             dest_path = os.path.dirname(self.dataHandler.getDataAbsoluteFilePath('directory'))
 
             # Write camera informations
-            with open(os.path.join(dest_path, "camera.json"), 'w') as f:
-                f.write(json.dumps(camPos))
+            if self.dataHandler.can_write:
+                with open(os.path.join(dest_path, "camera.json"), 'w') as f:
+                    f.write(json.dumps(camPos))
 
             # Extract images for each fields
             self.view.ResetActiveImageStack()
@@ -696,6 +710,9 @@ class GeometryDataSetBuilder(DataSetBuilder):
         self.dataHandler.addSection('CompositePipeline', pipelineMeta)
 
     def writeData(self, time=0):
+        if not self.dataHandler.can_write:
+            return
+
         currentScene = [];
         for data in self.config['scene']:
             currentData = {
@@ -804,6 +821,9 @@ class GeometryDataSetBuilder(DataSetBuilder):
 
 
     def stop(self, compress=True, clean=True):
+        if not self.dataHandler.can_write:
+            return
+
         DataSetBuilder.stop(self)
 
         if compress:

@@ -35,7 +35,7 @@ contourFilter = simple.Contour( Input = reader,
                           Isosurfaces = [0.1],
                           ComputeScalars = 1)
 
-contourValues = [ 0.09 + float(x)*0.001 for x in range(90) ]
+contourValues = [ 0.09 + float(x)*0.01 for x in range(9) ]
 
 sections = {
     "LookupTables": {
@@ -100,12 +100,12 @@ dsb = GeometryDataSetBuilder(outputDir, sceneDescription, sections=sections)
 
 
 dsb.getDataHandler().registerArgument(priority=1, name='contour', values=contourValues, ui='slider', loop='modulo')
-dsb.getDataHandler().registerArgument(priority=2, name='clip', values=range(10), ui='slider', loop='modulo')
+dsb.getDataHandler().registerArgument(priority=2, name='clip', values=range(5), ui='slider', loop='modulo')
 
 dsb.start()
 for v in dsb.getDataHandler().clip:
     for c in dsb.getDataHandler().contour:
-        clip.ClipType.Origin = [0.0, float(v) - 5.0, 0.0]
+        clip.ClipType.Origin = [0.0, float(2*v) - 5.0, 0.0]
         contourFilter.Isosurfaces = [ c ]
         dsb.writeData()
 dsb.stop()
