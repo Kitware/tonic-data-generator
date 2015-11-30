@@ -12,10 +12,10 @@
     "shelljs": "0.5.3"
   },
   "devDependencies": {
-    "cz-conventional-changelog": "1.1.0"
+    "cz-conventional-changelog": "1.1.4"
   },
   "scripts": {
-    "commit": "git-cz",
+    "commit": "git cz",
     "semantic-release": "semantic-release pre && npm publish && semantic-release post",
 
     "dep:release": "npm install commitizen@1.0.4 semantic-release@4.3.5",
@@ -26,9 +26,13 @@
   },
   "bin": {
     "tonic-install-py": "./bin/tonic-install-py-cli.js",
-    "tonic-run-py": "./bin/tonic-run-py-cli.js"
+    "tonic-run-py": "./bin/tonic-run-py-cli.js",
+    "Tonic2Cinema": "./bin/tonic2cinema-cli.js",
+    "Cinema2Tonic": "./bin/cinema2tonic-cli.js"
   },
-  "czConfig": {
-    "path": "node_modules/cz-conventional-changelog"
+  "config": {
+    "commitizen": {
+      "path": "node_modules/cz-conventional-changelog"
+    }
   }
 }
