@@ -18,7 +18,7 @@
     "commit": "git cz",
     "semantic-release": "semantic-release pre && npm publish && semantic-release post",
 
-    "dep:release": "npm install commitizen@1.0.4 semantic-release@4.3.5",
+    "dep:release": "npm install commitizen@2.4.6 semantic-release@4.3.5",
 
     "dep:travis" : "npm run dep:release",
     "dep:local"  : "npm run dep:release",
