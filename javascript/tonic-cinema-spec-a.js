@@ -6,7 +6,7 @@ var fs = require('fs'),
     },
     tonicBinds = {
         theta: {
-            mouse: { drag: { modifier: 0, coordinate: 1, step: 30, orientation: -1 } }
+            mouse: { drag: { modifier: 0, coordinate: 1, step: 30, orientation: +1 } }
         },
         phi: {
             mouse: { drag: { modifier: 0, coordinate: 0, step: 10, orientation: +1 } }
@@ -53,6 +53,34 @@ function convertTonicQueryDataModelToCinemaSpecA(tonicMetadata, destinationDirec
     });
 }
 
+function convertCinemaArgToTonic(argName, cinemaArg) {
+    var tonicArg = {};
+
+    // Fill data if needed
+    tonicArg.values = cinemaArg.values;
+    if(cinemaArg.values.indexOf(cinemaArg.default) > 0) {
+        tonicArg.default = cinemaArg.values.indexOf(cinemaArg.default);
+    }
+    if(cinemaArg.type === 'range') {
+        tonicArg.ui  = 'slider';
+    }
+    if(cinemaArg.label !== argName) {
+        tonicArg.label = cinemaArg.label;
+    }
+
+    // Add default binding
+    if(tonicBinds[argName]) {
+        tonicArg.bind = tonicBinds[argName];
+    }
+
+    // Add default looping
+    if(argName === 'phi') {
+        tonicArg.loop = 'modulo';
+    }
+
+    return tonicArg;
+}
+
 function convertCinemaSpecAToTonic(cinemaMetadata, destinationDirectory) {
     var tonicFormat = {
         type: [ 'tonic-query-data-model' ],
@@ -68,30 +96,8 @@ function convertCinemaSpecAToTonic(cinemaMetadata, destinationDirectory) {
 
     // Process arguments
     for(var argName in cinemaMetadata.arguments) {
-        var tonicArg = {},
-            cinemaArg = cinemaMetadata.arguments[argName];
-
-        // Fill data if needed
-        tonicArg.values = cinemaArg.values;
-        if(cinemaArg.values.indexOf(cinemaArg.default) > 0) {
-            tonicArg.default = cinemaArg.values.indexOf(cinemaArg.default);
-        }
-        if(cinemaArg.type === 'range') {
-            tonicArg.ui  = 'slider';
-        }
-        if(cinemaArg.label !== argName) {
-            tonicArg.label = cinemaArg.label;
-        }
-
-        // Add default binding
-        if(tonicBinds[argName]) {
-            tonicArg.bind = tonicBinds[argName];
-        }
-
-        // Add default looping
-        if(argName === 'phi') {
-            tonicArg.loop = 'modulo';
-        }
+        var cinemaArg = cinemaMetadata.arguments[argName],
+            tonicArg = convertCinemaArgToTonic(argName, cinemaArg);
 
         if(tonicArg.values.length > 1) {
             tonicFormat.arguments_order.push(argName);
@@ -120,4 +126,5 @@ function convertCinemaSpecAToTonic(cinemaMetadata, destinationDirectory) {
 module.exports = {
     cinema: convertTonicQueryDataModelToCinemaSpecA,
     tonic: convertCinemaSpecAToTonic,
+    tonicArg: convertCinemaArgToTonic
 };

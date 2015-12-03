@@ -17,6 +17,30 @@ def getScalarFromRGB(rgb, scalarRange=[-1.0, 1.0]):
         # No value
         return float('NaN')
 
+def convertImageToFloat(srcPngImage, destFile, scalarRange=[0.0, 1.0]):
+    reader = vtkPNGReader()
+    reader.SetFileName(srcPngImage)
+    reader.Update()
+    rgbArray = reader.GetOutput().GetPointData().GetArray(0)
+    stackSize = rgbArray.GetNumberOfTuples()
+    size = reader.GetOutput().GetDimensions()
+
+
+    outputArray = vtkFloatArray()
+    outputArray.SetNumberOfComponents(1)
+    outputArray.SetNumberOfTuples(stackSize)
+
+    for idx in range(stackSize):
+        outputArray.SetTuple1(
+            idx,
+            getScalarFromRGB(rgbArray.GetTuple(idx), scalarRange)
+        )
+
+    # Write float file
+    with open(destFile, 'wb') as f:
+        f.write(buffer(outputArray))
+
+    return size
 
 
 # -----------------------------------------------------------------------------
