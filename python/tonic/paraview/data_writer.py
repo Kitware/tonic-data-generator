@@ -1,6 +1,6 @@
 import os, math
 
-from paraview import simple
+from paraview import simple, servermanager
 from vtk import *
 
 VTK_DATA_TYPES = [ 'void',            # 0
@@ -27,7 +27,7 @@ VTK_DATA_TYPES = [ 'void',            # 0
 
 
 class ScalarRenderer(object):
-    def __init__(self, removePNG=True):
+    def __init__(self, isWriter=True, removePNG=True):
         simple.LoadDistributedPlugin('RGBZView')
 
         self.view = simple.CreateView('RGBZView')
@@ -37,6 +37,8 @@ class ScalarRenderer(object):
 
         self.reader = vtkPNGReader()
         self.cleanAfterMe = removePNG
+
+        self.canWrite = isWriter
 
     def getView(self):
         return self.view
@@ -52,26 +54,28 @@ class ScalarRenderer(object):
         self.view.ResetClippingBounds()
         simple.SaveScreenshot(tmpFileName, self.view)
 
-        # Convert data
-        self.reader.SetFileName(tmpFileName)
-        self.reader.Update()
+        if self.canWrite:
+            print "I am root",servermanager.vtkProcessModule.GetProcessModule().GetPartitionId()
+            # Convert data
+            self.reader.SetFileName(tmpFileName)
+            self.reader.Update()
 
-        rgbArray = self.reader.GetOutput().GetPointData().GetArray(0)
-        arraySize = rgbArray.GetNumberOfTuples()
+            rgbArray = self.reader.GetOutput().GetPointData().GetArray(0)
+            arraySize = rgbArray.GetNumberOfTuples()
 
-        rawArray = vtkUnsignedCharArray()
-        rawArray.SetNumberOfTuples(arraySize)
+            rawArray = vtkUnsignedCharArray()
+            rawArray.SetNumberOfTuples(arraySize)
 
-        for idx in range(arraySize):
-            light = rgbArray.GetTuple3(idx)[0]
-            rawArray.SetTuple1(idx, light)
+            for idx in range(arraySize):
+                light = rgbArray.GetTuple3(idx)[0]
+                rawArray.SetTuple1(idx, light)
 
-        with open(path, 'wb') as f:
-            f.write(buffer(rawArray))
+            with open(path, 'wb') as f:
+                f.write(buffer(rawArray))
 
-        # Delete temporary file
-        if self.cleanAfterMe:
-            os.remove(tmpFileName)
+            # Delete temporary file
+            if self.cleanAfterMe:
+                os.remove(tmpFileName)
 
         simple.Hide(source, self.view)
 
@@ -87,26 +91,28 @@ class ScalarRenderer(object):
         self.view.ResetClippingBounds()
         simple.SaveScreenshot(tmpFileName, self.view)
 
-        # Convert data
-        self.reader.SetFileName(tmpFileName)
-        self.reader.Update()
+        if self.canWrite:
+            print "I am root",servermanager.vtkProcessModule.GetProcessModule().GetPartitionId()
+            # Convert data
+            self.reader.SetFileName(tmpFileName)
+            self.reader.Update()
 
-        rgbArray = self.reader.GetOutput().GetPointData().GetArray(0)
-        arraySize = rgbArray.GetNumberOfTuples()
+            rgbArray = self.reader.GetOutput().GetPointData().GetArray(0)
+            arraySize = rgbArray.GetNumberOfTuples()
 
-        rawArray = vtkUnsignedCharArray()
-        rawArray.SetNumberOfTuples(arraySize)
+            rawArray = vtkUnsignedCharArray()
+            rawArray.SetNumberOfTuples(arraySize)
 
-        for idx in range(arraySize):
-            light = rgbArray.GetTuple3(idx)[0]
-            rawArray.SetTuple1(idx, light)
+            for idx in range(arraySize):
+                light = rgbArray.GetTuple3(idx)[0]
+                rawArray.SetTuple1(idx, light)
 
-        with open(path, 'wb') as f:
-            f.write(buffer(rawArray))
+            with open(path, 'wb') as f:
+                f.write(buffer(rawArray))
 
-        # Delete temporary file
-        if self.cleanAfterMe:
-            os.remove(tmpFileName)
+            # Delete temporary file
+            if self.cleanAfterMe:
+                os.remove(tmpFileName)
 
         simple.Hide(source, self.view)
 
@@ -150,37 +156,39 @@ class ScalarRenderer(object):
         simple.SaveScreenshot(tmpFileName, self.view)
         self.view.StopCaptureValues()
 
-        # Convert data
-        self.reader.SetFileName(tmpFileName)
-        self.reader.Update()
+        if self.canWrite:
+            print "I am root",servermanager.vtkProcessModule.GetProcessModule().GetPartitionId()
+            # Convert data
+            self.reader.SetFileName(tmpFileName)
+            self.reader.Update()
 
-        rgbArray = self.reader.GetOutput().GetPointData().GetArray(0)
-        arraySize = rgbArray.GetNumberOfTuples()
+            rgbArray = self.reader.GetOutput().GetPointData().GetArray(0)
+            arraySize = rgbArray.GetNumberOfTuples()
 
-        rawArray = vtkFloatArray()
-        rawArray.SetNumberOfTuples(arraySize)
+            rawArray = vtkFloatArray()
+            rawArray.SetNumberOfTuples(arraySize)
 
-        minValue = 10000.0
-        maxValue = -100000.0
-        delta = (dataRange[1] - dataRange[0]) / 16777215.0 # 2^24 - 1 => 16,777,215
-        for idx in range(arraySize):
-            rgb = rgbArray.GetTuple3(idx)
-            if rgb[0] != 0 or rgb[1] != 0 or rgb[2] != 0:
-                value = dataRange[0] + delta * float(rgb[0]*65536 + rgb[1]*256 + rgb[2] - 1)
-                rawArray.SetTuple1(idx, value)
-                minValue = min(value, minValue)
-                maxValue = max(value, maxValue)
-            else:
-                rawArray.SetTuple1(idx, float('NaN'))
+            minValue = 10000.0
+            maxValue = -100000.0
+            delta = (dataRange[1] - dataRange[0]) / 16777215.0 # 2^24 - 1 => 16,777,215
+            for idx in range(arraySize):
+                rgb = rgbArray.GetTuple3(idx)
+                if rgb[0] != 0 or rgb[1] != 0 or rgb[2] != 0:
+                    value = dataRange[0] + delta * float(rgb[0]*65536 + rgb[1]*256 + rgb[2] - 1)
+                    rawArray.SetTuple1(idx, value)
+                    minValue = min(value, minValue)
+                    maxValue = max(value, maxValue)
+                else:
+                    rawArray.SetTuple1(idx, float('NaN'))
 
-        # print 'Array bounds', minValue, maxValue, 'compare to', dataRange
+            # print 'Array bounds', minValue, maxValue, 'compare to', dataRange
 
-        with open(path, 'wb') as f:
-            f.write(buffer(rawArray))
+            with open(path, 'wb') as f:
+                f.write(buffer(rawArray))
 
-        # Delete temporary file
-        if self.cleanAfterMe:
-          os.remove(tmpFileName)
+            # Delete temporary file
+            if self.cleanAfterMe:
+              os.remove(tmpFileName)
 
         # Remove representation from view
         simple.Hide(source, self.view)
