@@ -214,7 +214,7 @@ class DataProberDataSetBuilder(DataSetBuilder):
 class LayerDataSetBuilder(DataSetBuilder):
     def __init__(self, input, location, cameraInfo, imageSize=[500,500], metadata={}):
         DataSetBuilder.__init__(self, location, cameraInfo, metadata)
-        self.dataRenderer = data_writer.ScalarRenderer()
+        self.dataRenderer = data_writer.ScalarRenderer(isWriter=self.dataHandler.can_write)
         self.view = self.dataRenderer.getView()
         self.view.ViewSize = imageSize
         self.floatImage = {'dimensions': imageSize, 'layers': [], 'ranges': {}}
@@ -287,7 +287,6 @@ class LayerDataSetBuilder(DataSetBuilder):
                         self.view.CameraPosition = camPos['position']
                         self.view.CameraViewUp = camPos['viewUp']
                         self.dataRenderer.writeMeshArray(self.dataHandler.getDataAbsoluteFilePath('%s__mesh'%self.activeLayer), self.activeSource)
-
 
             for camPos in self.getCamera():
                 self.view.CameraFocalPoint = camPos['focalPoint']
